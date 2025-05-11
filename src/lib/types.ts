@@ -8,6 +8,8 @@ export interface OrganizationDetails {
   gstNumber: string;
   address: string;
   contactDetails: string; // Could be more structured: phone, email
+  invoiceHeaderColor?: string; // Hex color string
+  themeAccentColor?: string; // Hex color string
 }
 
 export interface InventoryItem {
@@ -64,5 +66,6 @@ export interface AppData {
   invoices: Invoice[];
   actionLog: ActionLogEntry[];
 }
+
 
 

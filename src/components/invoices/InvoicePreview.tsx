@@ -9,6 +9,8 @@ interface InvoicePreviewProps {
   invoice: Invoice;
 }
 
+const DEFAULT_INVOICE_HEADER_COLOR = 'hsl(var(--primary))'; // Fallback to theme's primary color
+
 export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
   const org = invoice.organizationDetails;
 
@@ -18,6 +20,8 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
     const sgstAmount = basePrice * ((item.sgstRate || 0) / 100);
     return basePrice + cgstAmount + sgstAmount;
   };
+
+  const companyNameColor = org.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR;
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg print:shadow-none print:border-none">
@@ -35,7 +39,12 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                 className="h-auto max-h-[60px] w-auto object-contain mb-2"
               />
             )}
-            <h1 className="text-2xl font-bold text-primary">{org.companyName || "Your Company"}</h1>
+            <h1 
+              className="text-2xl font-bold" 
+              style={{ color: companyNameColor }}
+            >
+              {org.companyName || "Your Company"}
+            </h1>
             <p className="text-sm text-muted-foreground">{org.address}</p>
             <p className="text-sm text-muted-foreground">{org.contactDetails}</p>
             {org.gstNumber && <p className="text-sm text-muted-foreground">GSTIN: {org.gstNumber}</p>}
@@ -128,3 +137,4 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
     </Card>
   );
 }
+

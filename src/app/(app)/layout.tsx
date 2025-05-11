@@ -10,6 +10,8 @@ import { DEFAULT_REDIRECT_UNAUTHENTICATED } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SidebarProvider, Sidebar, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
 import AppSidebar from '@/components/shared/AppSidebar'; // Using the custom AppSidebar adapting shadcn's
+import ThemeApplicator from '@/components/shared/ThemeApplicator';
+
 
 export default function AppLayout({
   children,
@@ -48,6 +50,7 @@ export default function AppLayout({
 
   return (
     <SidebarProvider defaultOpen={true}>
+        <ThemeApplicator />
         <AppSidebar />
         <SidebarInset>
             <AppHeader />
@@ -59,3 +62,4 @@ export default function AppLayout({
     </SidebarProvider>
   );
 }
+

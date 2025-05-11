@@ -41,6 +41,8 @@ const defaultOrgDetails: OrganizationDetails = {
   gstNumber: '',
   address: '',
   contactDetails: '',
+  invoiceHeaderColor: '#739EDC', // Default to current primary color
+  themeAccentColor: '#149E8E', // Default to current accent color (HSL 155 80% 40%)
 };
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
@@ -63,8 +65,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   const setOrganizationDetails = (details: OrganizationDetails) => {
-    setOrgDetailsStorage(details);
-    logAction("Updated Organization Details", details);
+    setOrgDetailsStorage(prevDetails => ({
+      ...defaultOrgDetails, // Ensure all fields from default are present
+      ...prevDetails,      // Spread previous details
+      ...details           // Override with new details
+    }));
+    logAction("Updated Organization Settings", details);
   };
 
   // Inventory Management

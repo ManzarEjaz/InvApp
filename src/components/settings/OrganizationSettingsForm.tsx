@@ -24,9 +24,14 @@ const orgDetailsSchema = z.object({
   gstNumber: z.string().optional(),
   address: z.string().min(1, "Address is required"),
   contactDetails: z.string().min(1, "Contact details are required"),
+  invoiceHeaderColor: z.string().optional().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color"),
+  themeAccentColor: z.string().optional().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color"),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
+
+const DEFAULT_INVOICE_HEADER_COLOR = '#739EDC';
+const DEFAULT_THEME_ACCENT_COLOR = '#149E8E';
 
 export default function OrganizationSettingsForm() {
   const { organizationDetails, setOrganizationDetails, logAction } = useAppState();
@@ -36,18 +41,24 @@ export default function OrganizationSettingsForm() {
 
   const form = useForm<OrgDetailsFormValues>({
     resolver: zodResolver(orgDetailsSchema),
-    defaultValues: organizationDetails || {
-      companyName: '',
-      companyLogo: '',
-      gstNumber: '',
-      address: '',
-      contactDetails: '',
+    defaultValues: {
+      companyName: organizationDetails?.companyName || '',
+      companyLogo: organizationDetails?.companyLogo || '',
+      gstNumber: organizationDetails?.gstNumber || '',
+      address: organizationDetails?.address || '',
+      contactDetails: organizationDetails?.contactDetails || '',
+      invoiceHeaderColor: organizationDetails?.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
+      themeAccentColor: organizationDetails?.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
     },
   });
 
   useEffect(() => {
     if (organizationDetails) {
-      form.reset(organizationDetails);
+      form.reset({
+        ...organizationDetails,
+        invoiceHeaderColor: organizationDetails.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
+        themeAccentColor: organizationDetails.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
+      });
       if (organizationDetails.companyLogo) {
         setLogoPreview(organizationDetails.companyLogo);
       }
@@ -183,6 +194,56 @@ export default function OrganizationSettingsForm() {
                 </FormItem>
               )}
             />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FormField
+                control={form.control}
+                name="invoiceHeaderColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Invoice Header Color</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center gap-2">
+                        <Input type="color" {...field} className="w-12 h-10 p-1" />
+                        <Input 
+                          type="text" 
+                          value={field.value} 
+                          onChange={field.onChange}
+                          placeholder="#739EDC"
+                          className="w-32"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormDescription>Color for the company name on invoices.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="themeAccentColor"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Theme Accent Color</FormLabel>
+                    <FormControl>
+                       <div className="flex items-center gap-2">
+                        <Input type="color" {...field} className="w-12 h-10 p-1" />
+                         <Input 
+                          type="text" 
+                          value={field.value} 
+                          onChange={field.onChange}
+                          placeholder="#149E8E"
+                          className="w-32"
+                        />
+                      </div>
+                    </FormControl>
+                    <FormDescription>Main accent color for UI elements.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
           </CardContent>
           <CardFooter>
             <Button type="submit" disabled={isSubmitting}>
