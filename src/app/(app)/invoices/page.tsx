@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppState } from "@/contexts/AppStateContext";
 import Link from "next/link";
-import { PlusCircle, Edit3, Eye, Trash2, Search, FileText, Printer, Loader2 } from "lucide-react"; // Added Printer, Loader2
+import { PlusCircle, Edit3, Eye, Trash2, Search, FileText, Printer, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -22,26 +22,25 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
-import InvoicePreview from "@/components/invoices/InvoicePreview"; // For direct print
+import InvoicePreview from "@/components/invoices/InvoicePreview"; 
 import html2pdf from 'html2pdf.js';
-import * as ReactDOMClient from 'react-dom/client'; // For React 18 rendering
+import * as ReactDOMClient from 'react-dom/client'; 
 
 export default function InvoicesPage() {
   const { invoices, deleteInvoice, logAction } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
-  const [isPrinting, setIsPrinting] = useState<string | null>(null); // Tracks printing state by invoice ID
+  const [isPrinting, setIsPrinting] = useState<string | null>(null); 
 
   const filteredInvoices = invoices
     .filter(invoice => {
-      if (!invoice) return false; // Handle null/undefined invoices in the array
+      if (!invoice) return false; 
       const searchTermLower = searchTerm.toLowerCase();
       const invoiceNumberMatch = typeof invoice.invoiceNumber === 'string' && invoice.invoiceNumber.toLowerCase().includes(searchTermLower);
       const customerNameMatch = typeof invoice.customerName === 'string' && invoice.customerName.toLowerCase().includes(searchTermLower);
       return invoiceNumberMatch || customerNameMatch;
     })
     .sort((a, b) => {
-      // Ensure a and b and their dates are valid before comparing
       const dateA = a && a.date ? new Date(a.date).getTime() : 0;
       const dateB = b && b.date ? new Date(b.date).getTime() : 0;
       return dateB - dateA;
@@ -55,8 +54,8 @@ export default function InvoicesPage() {
   };
 
   const commonPdfOptions = (invoiceNumber: string) => ({
-    margin: 0.5, // inches
-    filename: `invoice-${invoiceNumber || 'unknown'}.pdf`, // Fallback for filename
+    margin: 0.5, 
+    filename: `invoice-${invoiceNumber || 'unknown'}.pdf`, 
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -68,7 +67,7 @@ export default function InvoicesPage() {
 
     const printContainer = document.createElement('div');
     printContainer.style.position = 'fixed';
-    printContainer.style.left = '-9999px'; // Off-screen
+    printContainer.style.left = '-9999px'; 
     printContainer.style.top = '-9999px';
     printContainer.style.width = '210mm'; 
     printContainer.style.height = '297mm'; 
@@ -80,7 +79,7 @@ export default function InvoicesPage() {
         reactRoot.render(<InvoicePreview invoice={invoiceToPrint} />);
     } else {
         toast({ title: "Print Error", description: "Unsupported React version for printing.", variant: "destructive" });
-        if (printContainer) document.body.removeChild(printContainer);
+        if (printContainer.parentNode === document.body) document.body.removeChild(printContainer);
         setIsPrinting(null);
         return;
     }
@@ -146,15 +145,25 @@ export default function InvoicesPage() {
       }
     } catch (error) {
       console.error('Error generating or printing PDF:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error during print preparation';
-      toast({ title: "Print Error", description: `Failed: ${errorMessage}`, variant: "destructive" });
+      let description = 'Unknown error during print preparation';
+      const errString = String(error).toLowerCase();
+
+      if (error instanceof Error) {
+        description = error.message;
+      }
+      
+      if (errString.includes('networkerror') || (error instanceof Error && error.message.toLowerCase().includes('networkerror'))) {
+        description = "A network error occurred while preparing the PDF for printing, possibly when fetching an image. Please check your connection.";
+      }
+      
+      toast({ title: "Print Error", description: `Failed: ${description}`, variant: "destructive" });
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     } finally {
       if (appLayoutMain && originalMainClass !== undefined) {
         appLayoutMain.className = originalMainClass;
       }
       if (reactRoot) reactRoot.unmount();
-      if (printContainer.parentNode === document.body) { // Ensure it's still a child of body
+      if (printContainer.parentNode === document.body) { 
           document.body.removeChild(printContainer);
       }
       setIsPrinting(null);

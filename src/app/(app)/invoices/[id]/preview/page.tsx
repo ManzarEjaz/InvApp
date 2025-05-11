@@ -68,7 +68,12 @@ export default function PreviewInvoicePage() {
           await html2pdf().from(element).set(opt).save();
         } catch (err) {
           console.error("Error generating PDF for download:", err);
-          toast({ title: "Download Error", description: "Failed to generate PDF for download.", variant: "destructive" });
+          let description = "Failed to generate PDF for download.";
+          const errString = String(err).toLowerCase();
+          if (errString.includes('networkerror') || (err instanceof Error && err.message.toLowerCase().includes('networkerror'))) {
+            description = "A network error occurred while generating the PDF. This might be due to issues fetching external images (like a default logo). Please check your internet connection and try again.";
+          }
+          toast({ title: "Download Error", description, variant: "destructive" });
         }
       });
     }
@@ -90,15 +95,12 @@ export default function PreviewInvoicePage() {
 
         if (printWindow) {
           printWindow.onload = () => {
-            // This might run before the PDF is fully rendered by the browser's viewer
-            // A timeout helps, but it's not foolproof
             setTimeout(() => {
               try {
                 if (!printWindow.closed) {
                   printWindow.focus();
                   printWindow.print();
                 }
-                // Don't revoke blobUrl here, as print dialog might still be using it.
               } catch (e) {
                 console.error("Error initiating print in the new window (onload):", e);
                 toast({
@@ -106,21 +108,17 @@ export default function PreviewInvoicePage() {
                   description: "Your invoice is in a new tab. Please use the browser's print option if the dialog didn't appear automatically.",
                 });
               }
-            }, 500); // Adjust delay as needed
+            }, 500); 
           };
-          // Attempt print even if onload is slow or doesn't fire reliably for PDF viewers
            setTimeout(() => {
                 if (printWindow && !printWindow.closed) {
                     try {
-                        // Check if print function exists and window is still open
                         if (typeof printWindow.print === 'function') {
-                            printWindow.focus(); // Important for some browsers
+                            printWindow.focus(); 
                             printWindow.print();
                         }
                     } catch (e) {
-                        // This catch is for the setTimeout attempt, onload has its own.
                          console.error("Error initiating print in the new window (timeout fallback):", e);
-                         // Avoid double-toasting if onload error also occurs
                          if (!toast.toasts.find(t => t.title === "Print Ready")) {
                             toast({
                                 title: "Print Ready",
@@ -129,20 +127,22 @@ export default function PreviewInvoicePage() {
                          }
                     }
                 }
-            }, 1200); // Longer delay for this fallback attempt
+            }, 1200); 
         } else {
           toast({ title: "Print Error", description: "Could not open print window. Check pop-up blocker.", variant: "destructive" });
           if (blobUrl) URL.revokeObjectURL(blobUrl);
         }
       } catch (err) {
         console.error("Error generating PDF for printing:", err);
-        toast({ title: "PDF Error", description: "Failed to generate PDF for printing.", variant: "destructive" });
+        let description = "Failed to generate PDF for printing.";
+        const errString = String(err).toLowerCase();
+        if (errString.includes('networkerror') || (err instanceof Error && err.message.toLowerCase().includes('networkerror'))) {
+          description = "A network error occurred while generating the PDF for printing. This might be due to issues fetching external images. Please check your connection and try again.";
+        }
+        toast({ title: "PDF Error", description, variant: "destructive" });
         if (blobUrl) URL.revokeObjectURL(blobUrl);
       }
     });
-    // Note: Revoking blobUrl is tricky. If revoked too soon, print/display fails.
-    // Best to let the browser manage it when the new tab/window is closed.
-    // If blobUrl needs explicit cleanup, it should be done much later or based on window events.
   };
 
 
