@@ -14,9 +14,12 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useAppState } from '@/contexts/AppStateContext';
 import type { OrganizationDetails } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, UploadCloud } from 'lucide-react';
+import { Loader2, UploadCloud, RotateCcw } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+
+const hexColorRegex = /^#[0-9a-fA-F]{6}$/;
+const hexColorErrorMessage = "Must be a valid hex color (e.g. #RRGGBB)";
 
 const orgDetailsSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
@@ -25,17 +28,21 @@ const orgDetailsSchema = z.object({
   address: z.string().min(1, "Address is required"),
   contactDetails: z.string().min(1, "Contact details are required"),
   invoiceHeaderColor: z.string()
-    .regex(/^(|#[0-9a-fA-F]{6})$/, "Must be a valid hex color (e.g. #RRGGBB) or empty to use default.")
+    .refine((val) => val === '' || hexColorRegex.test(val), {
+      message: hexColorErrorMessage,
+    })
     .optional(),
   themeAccentColor: z.string()
-    .regex(/^(|#[0-9a-fA-F]{6})$/, "Must be a valid hex color (e.g. #RRGGBB) or empty to use default.")
+    .refine((val) => val === '' || hexColorRegex.test(val), {
+      message: hexColorErrorMessage,
+    })
     .optional(),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
 
-const DEFAULT_INVOICE_HEADER_COLOR = '#739EDC';
-const DEFAULT_THEME_ACCENT_COLOR = '#149E8E';
+const DEFAULT_INVOICE_HEADER_COLOR = '#739EDC'; // Corresponds to HSL 215 60% 65% (Muted Blue)
+const DEFAULT_THEME_ACCENT_COLOR = '#00BF62'; // Corresponds to HSL 155 100% 37% (Teal) - Updated to match spec
 
 export default function OrganizationSettingsForm() {
   const { organizationDetails, setOrganizationDetails, logAction } = useAppState();
@@ -46,13 +53,13 @@ export default function OrganizationSettingsForm() {
   const form = useForm<OrgDetailsFormValues>({
     resolver: zodResolver(orgDetailsSchema),
     defaultValues: {
-      companyName: organizationDetails?.companyName || '',
-      companyLogo: organizationDetails?.companyLogo || '',
-      gstNumber: organizationDetails?.gstNumber || '',
-      address: organizationDetails?.address || '',
-      contactDetails: organizationDetails?.contactDetails || '',
-      invoiceHeaderColor: organizationDetails?.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
-      themeAccentColor: organizationDetails?.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
+      companyName: '',
+      companyLogo: '',
+      gstNumber: '',
+      address: '',
+      contactDetails: '',
+      invoiceHeaderColor: DEFAULT_INVOICE_HEADER_COLOR,
+      themeAccentColor: DEFAULT_THEME_ACCENT_COLOR,
     },
   });
 
@@ -89,11 +96,11 @@ export default function OrganizationSettingsForm() {
   const onSubmit: SubmitHandler<OrgDetailsFormValues> = async (data) => {
     setIsSubmitting(true);
     try {
-      // Ensure empty strings for colors are treated as undefined to trigger defaults if necessary
       const processedData = {
         ...data,
-        invoiceHeaderColor: data.invoiceHeaderColor === "" ? undefined : data.invoiceHeaderColor,
-        themeAccentColor: data.themeAccentColor === "" ? undefined : data.themeAccentColor,
+        // Store actual value, or default if empty. Let ThemeApplicator handle empty string as "use CSS default"
+        invoiceHeaderColor: data.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
+        themeAccentColor: data.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
       };
       setOrganizationDetails(processedData);
       logAction("Updated Organization Settings");
@@ -102,6 +109,15 @@ export default function OrganizationSettingsForm() {
       toast({ title: "Error", description: "Failed to save settings.", variant: "destructive" });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+  
+  const handleColorInputChange = (fieldOnChange: (value: string) => void, newValue: string) => {
+    if (newValue === '' || hexColorRegex.test(newValue)) {
+      fieldOnChange(newValue);
+    } else {
+      // Keep the input as is for typing, validation will show error
+      fieldOnChange(newValue);
     }
   };
 
@@ -145,7 +161,7 @@ export default function OrganizationSettingsForm() {
                 >
                 {logoPreview ? (
                     <div className="relative w-full h-32">
-                        <Image data-ai-hint="company logo" src={logoPreview} alt="Logo Preview" fill objectFit="contain" />
+                        <Image data-ai-hint="company logo" src={logoPreview} alt="Logo Preview" fill style={{objectFit:"contain"}} />
                     </div>
                 ) : (
                     <div className="space-y-1 text-center">
@@ -211,20 +227,29 @@ export default function OrganizationSettingsForm() {
                 name="invoiceHeaderColor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Invoice Header Color (Company Name)</FormLabel>
+                    <FormLabel>Invoice Header Color</FormLabel>
                     <FormControl>
                       <div className="flex items-center gap-2">
-                        <Input type="color" {...field} value={field.value || DEFAULT_INVOICE_HEADER_COLOR} className="w-12 h-10 p-1" />
+                        <Input type="color" {...field} value={field.value || DEFAULT_INVOICE_HEADER_COLOR} className="w-12 h-10 p-1 shrink-0" />
                         <Input 
                           type="text" 
                           value={field.value || ''} 
-                          onChange={field.onChange}
+                          onChange={(e) => handleColorInputChange(field.onChange, e.target.value)}
                           placeholder={DEFAULT_INVOICE_HEADER_COLOR}
                           className="w-32"
                         />
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          title="Reset to default"
+                          onClick={() => form.setValue('invoiceHeaderColor', DEFAULT_INVOICE_HEADER_COLOR, { shouldValidate: true, shouldDirty: true })}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
                       </div>
                     </FormControl>
-                    <FormDescription>Color for the company name on invoices. Cleared uses default.</FormDescription>
+                    <FormDescription>Color for the company name on invoices. Empty to use default.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -234,20 +259,29 @@ export default function OrganizationSettingsForm() {
                 name="themeAccentColor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Theme Accent Color (UI Elements)</FormLabel>
+                    <FormLabel>Theme Primary/Accent Color</FormLabel>
                     <FormControl>
                        <div className="flex items-center gap-2">
-                        <Input type="color" {...field} value={field.value || DEFAULT_THEME_ACCENT_COLOR} className="w-12 h-10 p-1" />
+                        <Input type="color" {...field} value={field.value || DEFAULT_THEME_ACCENT_COLOR} className="w-12 h-10 p-1 shrink-0" />
                          <Input 
                           type="text" 
                           value={field.value || ''} 
-                          onChange={field.onChange}
+                          onChange={(e) => handleColorInputChange(field.onChange, e.target.value)}
                           placeholder={DEFAULT_THEME_ACCENT_COLOR}
                           className="w-32"
                         />
+                         <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Reset to default"
+                            onClick={() => form.setValue('themeAccentColor', DEFAULT_THEME_ACCENT_COLOR, { shouldValidate: true, shouldDirty: true })}
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
                       </div>
                     </FormControl>
-                    <FormDescription>Main accent color for UI elements. Cleared uses default.</FormDescription>
+                    <FormDescription>Main color for UI elements like buttons and active states. Empty to use default.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -266,4 +300,3 @@ export default function OrganizationSettingsForm() {
     </Card>
   );
 }
-
