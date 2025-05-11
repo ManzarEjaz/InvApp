@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from 'react';
@@ -45,19 +44,26 @@ export default function ThemeApplicator() {
 
     const docStyle = document.documentElement.style;
 
-    // Apply Theme Accent Color
+    // Apply Theme Accent Color to --primary for main UI elements like buttons
     if (organizationDetails.themeAccentColor) {
       const hsl = hexToHSL(organizationDetails.themeAccentColor);
       if (hsl) {
-        docStyle.setProperty('--accent', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+        docStyle.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
+        // Potentially derive --primary-foreground if needed, or assume white/black is fine
+        // For simplicity, we'll let --primary-foreground be as defined in globals.css
       } else {
         // Invalid hex, remove property to fall back to CSS default
-        docStyle.removeProperty('--accent');
+        docStyle.removeProperty('--primary');
       }
     } else {
-      // No custom accent color set, remove property to fall back to CSS default
-      docStyle.removeProperty('--accent');
+      // No custom theme accent color set, remove property to fall back to CSS default
+      docStyle.removeProperty('--primary');
     }
+
+    // The --accent variable can remain as defined in globals.css or be controlled by another setting if desired in the future.
+    // For now, it's not dynamically changed here unless specified.
+    // If invoiceHeaderColor was meant for UI, it would be applied here too.
+    // Currently, invoiceHeaderColor is used directly in InvoicePreview.
 
   }, [organizationDetails]);
 
