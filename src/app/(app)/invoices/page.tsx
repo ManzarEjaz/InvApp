@@ -1,3 +1,4 @@
+
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,10 +32,21 @@ export default function InvoicesPage() {
   const { toast } = useToast();
   const [isPrinting, setIsPrinting] = useState<string | null>(null); // Tracks printing state by invoice ID
 
-  const filteredInvoices = invoices.filter(invoice => 
-    invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    invoice.customerName.toLowerCase().includes(searchTerm.toLowerCase())
-  ).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  const filteredInvoices = invoices
+    .filter(invoice => {
+      if (!invoice) return false; // Handle null/undefined invoices in the array
+      const searchTermLower = searchTerm.toLowerCase();
+      const invoiceNumberMatch = typeof invoice.invoiceNumber === 'string' && invoice.invoiceNumber.toLowerCase().includes(searchTermLower);
+      const customerNameMatch = typeof invoice.customerName === 'string' && invoice.customerName.toLowerCase().includes(searchTermLower);
+      return invoiceNumberMatch || customerNameMatch;
+    })
+    .sort((a, b) => {
+      // Ensure a and b and their dates are valid before comparing
+      const dateA = a && a.date ? new Date(a.date).getTime() : 0;
+      const dateB = b && b.date ? new Date(b.date).getTime() : 0;
+      return dateB - dateA;
+    });
+
 
   const handleDelete = (invoiceId: string, invoiceNumber: string) => {
     deleteInvoice(invoiceId);
@@ -44,23 +56,22 @@ export default function InvoicesPage() {
 
   const commonPdfOptions = (invoiceNumber: string) => ({
     margin: 0.5, // inches
-    filename: `invoice-${invoiceNumber}.pdf`,
+    filename: `invoice-${invoiceNumber || 'unknown'}.pdf`, // Fallback for filename
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
   });
 
   const handleDirectPrint = async (invoiceToPrint: Invoice) => {
-    if (!invoiceToPrint || isPrinting === invoiceToPrint.id) return;
+    if (!invoiceToPrint || !invoiceToPrint.id || isPrinting === invoiceToPrint.id) return;
     setIsPrinting(invoiceToPrint.id);
 
     const printContainer = document.createElement('div');
     printContainer.style.position = 'fixed';
     printContainer.style.left = '-9999px'; // Off-screen
     printContainer.style.top = '-9999px';
-    // Ensure the container itself is large enough not to constrain its content initially
-    printContainer.style.width = '210mm'; // A4 width, approx
-    printContainer.style.height = '297mm'; // A4 height, approx
+    printContainer.style.width = '210mm'; 
+    printContainer.style.height = '297mm'; 
     document.body.appendChild(printContainer);
 
     let reactRoot: ReactDOMClient.Root | null = null;
@@ -68,21 +79,17 @@ export default function InvoicesPage() {
         reactRoot = ReactDOMClient.createRoot(printContainer);
         reactRoot.render(<InvoicePreview invoice={invoiceToPrint} />);
     } else {
-        // Fallback for older React, though project uses 18
         toast({ title: "Print Error", description: "Unsupported React version for printing.", variant: "destructive" });
         if (printContainer) document.body.removeChild(printContainer);
         setIsPrinting(null);
         return;
     }
     
-
-    // Wait for the component to render.
     await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const opt = commonPdfOptions(invoiceToPrint.invoiceNumber);
     let blobUrl = '';
 
-    // Temporarily adjust layout for PDF generation
     const appLayoutMain = document.querySelector('main.flex-1');
     let originalMainClass: string | undefined;
     if (appLayoutMain) {
@@ -91,7 +98,6 @@ export default function InvoicesPage() {
     }
 
     try {
-      // Ensure there is content to print
       const contentToPrint = printContainer.firstChild;
       if (!contentToPrint) {
         throw new Error("Invoice content not found for printing.");
@@ -125,7 +131,7 @@ export default function InvoicesPage() {
                     }
                 } catch (e) {
                      console.error("Error initiating print in new window (timeout fallback):", e);
-                     if (!toast.toasts.find(t => t.title === "Print Ready")) {
+                     if (!(toast.toasts && toast.toasts.find(t => t.title === "Print Ready"))) {
                         toast({
                             title: "Print Ready",
                             description: "Invoice opened. Use browser's print (Ctrl/Cmd+P).",
@@ -140,14 +146,17 @@ export default function InvoicesPage() {
       }
     } catch (error) {
       console.error('Error generating or printing PDF:', error);
-      toast({ title: "Print Error", description: `Failed: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error during print preparation';
+      toast({ title: "Print Error", description: `Failed: ${errorMessage}`, variant: "destructive" });
       if (blobUrl) URL.revokeObjectURL(blobUrl);
     } finally {
       if (appLayoutMain && originalMainClass !== undefined) {
         appLayoutMain.className = originalMainClass;
       }
       if (reactRoot) reactRoot.unmount();
-      if (printContainer) document.body.removeChild(printContainer);
+      if (printContainer.parentNode === document.body) { // Ensure it's still a child of body
+          document.body.removeChild(printContainer);
+      }
       setIsPrinting(null);
     }
   };
@@ -209,11 +218,20 @@ export default function InvoicesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredInvoices.map((invoice) => (
+                  {filteredInvoices.map((invoice) => {
+                    if (!invoice || !invoice.id) {
+                        console.warn("Skipping rendering of invalid invoice data in list:", invoice);
+                        return null;
+                    }
+                    const statusDisplay = typeof invoice.status === 'string'
+                        ? invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)
+                        : 'Unknown';
+                    
+                    return (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
-                      <TableCell>{invoice.customerName}</TableCell>
-                      <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
+                      <TableCell className="font-medium">{invoice.invoiceNumber || 'N/A'}</TableCell>
+                      <TableCell>{invoice.customerName || 'N/A'}</TableCell>
+                      <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>{(invoice.grandTotal ?? 0).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={
@@ -224,7 +242,7 @@ export default function InvoicesPage() {
                         } className={
                           invoice.status === 'paid' ? 'bg-green-500 text-white' : ''
                         }>
-                          {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+                          {statusDisplay}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-right space-x-1">
@@ -253,12 +271,12 @@ export default function InvoicesPage() {
                             <AlertDialogHeader>
                               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                               <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete invoice {invoice.invoiceNumber}.
+                                This action cannot be undone. This will permanently delete invoice {invoice.invoiceNumber || 'N/A'}.
                               </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
                               <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => handleDelete(invoice.id, invoice.invoiceNumber)} className="bg-destructive hover:bg-destructive/90">
+                              <AlertDialogAction onClick={() => handleDelete(invoice.id, invoice.invoiceNumber || 'N/A')} className="bg-destructive hover:bg-destructive/90">
                                 Delete
                               </AlertDialogAction>
                             </AlertDialogFooter>
@@ -266,7 +284,7 @@ export default function InvoicesPage() {
                         </AlertDialog>
                       </TableCell>
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             </div>
@@ -281,3 +299,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
