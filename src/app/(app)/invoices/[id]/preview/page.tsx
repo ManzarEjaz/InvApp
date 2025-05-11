@@ -39,7 +39,6 @@ export default function PreviewInvoicePage() {
             <div className="flex gap-2">
                 <Skeleton className="h-10 w-24" />
                 <Skeleton className="h-10 w-24" />
-                <Skeleton className="h-10 w-24" />
             </div>
         </div>
         <Skeleton className="h-[800px] w-full" />
@@ -67,11 +66,6 @@ export default function PreviewInvoicePage() {
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
         <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link href={`/invoices/${invoice.id}/edit`}>
-              <Edit className="mr-2 h-4 w-4" /> Edit
-            </Link>
-          </Button>
           <Button onClick={handlePrint}>
             <Printer className="mr-2 h-4 w-4" /> Print Invoice
           </Button>
