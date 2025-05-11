@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { Invoice } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, Edit, AlertTriangle } from "lucide-react";
+import { Printer, ArrowLeft, AlertTriangle } from "lucide-react"; // Removed Edit icon
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -60,7 +60,7 @@ export default function PreviewInvoicePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:!m-0 print:!p-0 print:!space-y-0">
       <div className="flex flex-col sm:flex-row justify-between items-center print:hidden gap-2">
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back

@@ -8,7 +8,7 @@ import AppHeader from '@/components/shared/AppHeader';
 // import AppSidebar from '@/components/shared/AppSidebar'; // Using shadcn sidebar
 import { DEFAULT_REDIRECT_UNAUTHENTICATED } from '@/lib/constants';
 import { Skeleton } from '@/components/ui/skeleton';
-import { SidebarProvider, Sidebar, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
+import { SidebarProvider, SidebarInset, SidebarRail } from "@/components/ui/sidebar";
 import AppSidebar from '@/components/shared/AppSidebar'; // Using the custom AppSidebar adapting shadcn's
 import ThemeApplicator from '@/components/shared/ThemeApplicator';
 
@@ -51,14 +51,17 @@ export default function AppLayout({
   return (
     <SidebarProvider defaultOpen={true}>
         <ThemeApplicator />
-        <AppSidebar />
-        <SidebarInset>
-            <AppHeader />
-            <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto">
+        <AppSidebar className="print:hidden" />
+        <SidebarRail className="print:hidden" />
+        
+        <SidebarInset className="print:!p-0 print:!m-0 print:border-none print:shadow-none">
+            <AppHeader className="print:hidden" />
+            <main 
+                className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto print:!p-0 print:!m-0 print:overflow-visible"
+            >
                 {children}
             </main>
         </SidebarInset>
-        <SidebarRail />
     </SidebarProvider>
   );
 }
