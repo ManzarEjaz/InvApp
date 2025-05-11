@@ -29,39 +29,85 @@ export default function PreviewInvoicePage() {
     }
   }, [invoiceId, getInvoiceById, router]);
 
-  const handleDownloadPdf = () => {
+  const commonPdfOptions = (invoiceNumber: string) => ({
+    margin: 0.5, // inches
+    filename: `invoice-${invoiceNumber}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  });
+
+  const withTemporaryLayoutChange = async <T,>(action: () => Promise<T>): Promise<T> => {
+    const appLayoutMain = document.querySelector('main.flex-1');
+    const originalMainClass = appLayoutMain?.className;
+    if (appLayoutMain) {
+      appLayoutMain.className = 'p-0 m-0 overflow-visible';
+    }
+
+    try {
+      return await action();
+    } finally {
+      if (appLayoutMain && originalMainClass) {
+        appLayoutMain.className = originalMainClass;
+      }
+    }
+  };
+
+  const handleDownloadPdf = async () => {
     if (invoice && invoicePreviewRef.current) {
       const element = invoicePreviewRef.current;
-      const opt = {
-        margin: 0.5, // inches
-        filename: `invoice-${invoice.invoiceNumber}.pdf`,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true }, // useCORS true if there are external images like logo
-        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-      };
-      
-      // Temporarily remove print-specific layout classes from the main app layout for PDF generation
-      // This is a workaround if html2pdf still picks up some layout styles
-      const appLayoutMain = document.querySelector('main.flex-1');
-      const originalMainClass = appLayoutMain?.className;
-      if (appLayoutMain) {
-        appLayoutMain.className = 'p-0 m-0 overflow-visible'; 
-      }
+      const opt = commonPdfOptions(invoice.invoiceNumber);
 
-      html2pdf().from(element).set(opt).save().then(() => {
-        // Restore original classes after PDF generation
-        if (appLayoutMain && originalMainClass) {
-          appLayoutMain.className = originalMainClass;
-        }
-      }).catch(err => {
-        console.error("Error generating PDF:", err);
-        // Restore original classes even if there's an error
-        if (appLayoutMain && originalMainClass) {
-          appLayoutMain.className = originalMainClass;
+      await withTemporaryLayoutChange(async () => {
+        try {
+          await html2pdf().from(element).set(opt).save();
+        } catch (err) {
+          console.error("Error generating PDF for download:", err);
         }
       });
     }
   };
+
+  const handlePrintPdf = async () => {
+    if (invoice && invoicePreviewRef.current) {
+      const element = invoicePreviewRef.current;
+      const opt = commonPdfOptions(invoice.invoiceNumber);
+      
+      await withTemporaryLayoutChange(async () => {
+        try {
+          const blobUrl = await html2pdf().from(element).set(opt).output('bloburl');
+          
+          const iframe = document.createElement('iframe');
+          iframe.style.display = 'none';
+          iframe.src = blobUrl;
+          document.body.appendChild(iframe);
+
+          iframe.onload = () => {
+            setTimeout(() => { // Ensure PDF is rendered in iframe
+              try {
+                iframe.contentWindow?.focus();
+                iframe.contentWindow?.print();
+              } catch(printError) {
+                console.error("Error during printing:", printError);
+                // Fallback or user notification can be added here
+              } finally {
+                document.body.removeChild(iframe);
+                URL.revokeObjectURL(blobUrl);
+              }
+            }, 250); // Adjusted timeout for rendering
+          };
+          iframe.onerror = (err) => {
+            console.error("Error loading PDF into iframe:", err);
+            document.body.removeChild(iframe);
+            URL.revokeObjectURL(blobUrl);
+          }
+        } catch (err) {
+          console.error("Error generating PDF for printing:", err);
+        }
+      });
+    }
+  };
+
 
   if (invoice === undefined) {
     return (
@@ -71,6 +117,7 @@ export default function PreviewInvoicePage() {
             <div className="flex gap-2">
                 <Skeleton className="h-10 w-24" />
                 <Skeleton className="h-10 w-24" />
+                 <Skeleton className="h-10 w-24" />
             </div>
         </div>
         <Skeleton className="h-[800px] w-full" />
@@ -97,9 +144,12 @@ export default function PreviewInvoicePage() {
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button onClick={handleDownloadPdf}>
             <Download className="mr-2 h-4 w-4" /> Download PDF
+          </Button>
+          <Button onClick={handlePrintPdf}>
+            <Printer className="mr-2 h-4 w-4" /> Print PDF
           </Button>
         </div>
       </div>
