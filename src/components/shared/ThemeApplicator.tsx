@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect } from 'react';
@@ -43,27 +44,46 @@ export default function ThemeApplicator() {
     }
 
     const docStyle = document.documentElement.style;
+    const themeAccentHex = organizationDetails.themeAccentColor;
 
-    // Apply Theme Accent Color to --primary for main UI elements like buttons
-    if (organizationDetails.themeAccentColor) {
-      const hsl = hexToHSL(organizationDetails.themeAccentColor);
+    if (themeAccentHex && themeAccentHex.match(/^#[0-9a-fA-F]{6}$/)) {
+      const hsl = hexToHSL(themeAccentHex);
       if (hsl) {
-        docStyle.setProperty('--primary', `${hsl.h} ${hsl.s}% ${hsl.l}%`);
-        // Potentially derive --primary-foreground if needed, or assume white/black is fine
-        // For simplicity, we'll let --primary-foreground be as defined in globals.css
+        const primaryHslString = `${hsl.h} ${hsl.s}% ${hsl.l}%`;
+        docStyle.setProperty('--primary', primaryHslString);
+        docStyle.setProperty('--accent', primaryHslString); // Make general --accent follow --primary
+
+        // For sidebar accents, derive from primaryHslString
+        // Background: light, desaturated version of the primary color
+        // Foreground: the primary color itself
+        const sidebarAccentBgLightness = Math.max(30, Math.min(95, hsl.l + (92 - hsl.l) * 0.85)); // Target L around 92-95% like default, but not pure white
+        const sidebarAccentBgSaturation = Math.max(5, hsl.s * 0.25); // Significantly reduce saturation for background
+        
+        const sidebarAccentBgHslString = `${hsl.h} ${sidebarAccentBgSaturation.toFixed(0)}% ${sidebarAccentBgLightness.toFixed(0)}%`;
+        
+        docStyle.setProperty('--sidebar-accent', sidebarAccentBgHslString);
+        docStyle.setProperty('--sidebar-accent-foreground', primaryHslString);
+
+        // Note: --primary-foreground and --accent-foreground (for general buttons)
+        // will use their defaults from globals.css. This is by design, as they are typically
+        // white or black text that contrasts with the --primary/--accent background.
+        // If --primary becomes very light, its default white foreground might be an issue,
+        // but dynamic foreground calculation adds complexity not yet requested.
+
       } else {
-        // Invalid hex, remove property to fall back to CSS default
+        // Invalid hex, clear properties to fall back to CSS defaults
         docStyle.removeProperty('--primary');
+        docStyle.removeProperty('--accent');
+        docStyle.removeProperty('--sidebar-accent');
+        docStyle.removeProperty('--sidebar-accent-foreground');
       }
     } else {
-      // No custom theme accent color set, remove property to fall back to CSS default
+      // No custom theme accent color set or it's an empty string, clear properties to fall back to CSS defaults
       docStyle.removeProperty('--primary');
+      docStyle.removeProperty('--accent');
+      docStyle.removeProperty('--sidebar-accent');
+      docStyle.removeProperty('--sidebar-accent-foreground');
     }
-
-    // The --accent variable can remain as defined in globals.css or be controlled by another setting if desired in the future.
-    // For now, it's not dynamically changed here unless specified.
-    // If invoiceHeaderColor was meant for UI, it would be applied here too.
-    // Currently, invoiceHeaderColor is used directly in InvoicePreview.
 
   }, [organizationDetails]);
 
