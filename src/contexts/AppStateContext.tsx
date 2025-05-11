@@ -41,6 +41,7 @@ const defaultOrgDetails: OrganizationDetails = {
   gstNumber: '',
   address: '',
   contactDetails: '',
+  invoiceFooterText: 'Thank you for your business!', // Default footer text
 };
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
@@ -100,11 +101,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   };
   
   const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'invoiceNumber' | 'organizationDetails'> & { organizationDetails?: OrganizationDetails }) => {
+    const currentOrgDetails = organizationDetails || defaultOrgDetails;
     const newInvoice: Invoice = {
       ...invoiceData,
       id: uuidv4(),
       invoiceNumber: getNextInvoiceNumber(),
-      organizationDetails: invoiceData.organizationDetails || organizationDetails || defaultOrgDetails, // Use current org details
+      organizationDetails: invoiceData.organizationDetails || currentOrgDetails,
     };
     setInvoicesStorage(prev => [...prev, newInvoice]);
     logAction("Created Invoice", { invoiceNumber: newInvoice.invoiceNumber, id: newInvoice.id });
@@ -165,3 +167,4 @@ export const useAppState = (): AppStateContextType => {
   }
   return context;
 };
+

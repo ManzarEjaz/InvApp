@@ -10,13 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useAppState } from '@/contexts/AppStateContext';
 import type { OrganizationDetails } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
-import { cn } from '@/lib/utils'; // Added import for cn
+import { cn } from '@/lib/utils';
 
 const orgDetailsSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
@@ -24,6 +24,7 @@ const orgDetailsSchema = z.object({
   gstNumber: z.string().optional(),
   address: z.string().min(1, "Address is required"),
   contactDetails: z.string().min(1, "Contact details are required"),
+  invoiceFooterText: z.string().optional(),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
@@ -42,6 +43,7 @@ export default function OrganizationSettingsForm() {
       gstNumber: '',
       address: '',
       contactDetails: '',
+      invoiceFooterText: 'Thank you for your business!',
     },
   });
 
@@ -179,6 +181,18 @@ export default function OrganizationSettingsForm() {
                 <FormItem>
                   <FormLabel>Contact Details (Email, Phone)</FormLabel>
                   <FormControl><Input placeholder="contact@example.com / +1 555-1234" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="invoiceFooterText"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Invoice Footer Text (Optional)</FormLabel>
+                  <FormControl><Textarea placeholder="e.g., Thank you for your business! Payment is due upon receipt." {...field} rows={3} /></FormControl>
+                  <FormDescription>This text will appear at the bottom of your invoices.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
