@@ -73,6 +73,8 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           lineItems: existingInvoice.lineItems.map(li => ({
             ...li,
             id: li.id || Math.random().toString(36).substr(2, 9), // Ensure ID for existing but potentially unsaved items
+            cgstRate: li.cgstRate ?? (getInventoryItemById(li.inventoryItemId || '')?.cgstRate ?? (organizationDetails?.gstNumber ? 9 : 0)),
+            sgstRate: li.sgstRate ?? (getInventoryItemById(li.inventoryItemId || '')?.sgstRate ?? (organizationDetails?.gstNumber ? 9 : 0)),
           })),
         }
       : {
@@ -80,7 +82,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           customerAddress: '',
           date: new Date(),
           status: 'draft',
-          lineItems: [{ itemName: '', quantity: 1, price: 0, cgstRate: organizationDetails?.gstNumber ? 9 : 0, sgstRate: organizationDetails?.gstNumber ? 9 : 0 }], // Default CGST/SGST based on org GST
+          lineItems: [{ itemName: '', quantity: 1, price: 0, cgstRate: organizationDetails?.gstNumber ? 9 : 0, sgstRate: organizationDetails?.gstNumber ? 9 : 0 }],
           discountAmount: 0,
           notes: '',
         },
@@ -90,6 +92,25 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
     control: form.control,
     name: "lineItems",
   });
+
+  useEffect(() => {
+    // Pre-fill tax rates for new line items based on organization settings or selected inventory item
+    fields.forEach((field, index) => {
+      const currentLineItem = form.getValues(`lineItems.${index}`);
+      if (currentLineItem.inventoryItemId) {
+        const inventoryItem = getInventoryItemById(currentLineItem.inventoryItemId);
+        if (inventoryItem) {
+          form.setValue(`lineItems.${index}.cgstRate`, inventoryItem.cgstRate ?? (organizationDetails?.gstNumber ? 9 : 0), { shouldValidate: true });
+          form.setValue(`lineItems.${index}.sgstRate`, inventoryItem.sgstRate ?? (organizationDetails?.gstNumber ? 9 : 0), { shouldValidate: true });
+        }
+      } else if (currentLineItem.cgstRate === undefined || currentLineItem.sgstRate === undefined) {
+         // Only set default if not already set (e.g. by user or previous logic)
+        form.setValue(`lineItems.${index}.cgstRate`, organizationDetails?.gstNumber ? 9 : 0, { shouldValidate: true });
+        form.setValue(`lineItems.${index}.sgstRate`, organizationDetails?.gstNumber ? 9 : 0, { shouldValidate: true });
+      }
+    });
+  }, [fields, organizationDetails, form, getInventoryItemById]);
+
 
   const calculateTotals = (lineItems: LineItem[], discount: number = 0) => {
     let subTotal = 0;
@@ -139,12 +160,12 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
   
   const handleSelectInventoryItem = (item: AppInventoryItem, index: number) => {
     update(index, {
-        ...fields[index],
+        ...fields[index], // Keep existing fields like quantity if user already entered it
         inventoryItemId: item.id,
         itemName: item.name,
         price: item.price,
-        cgstRate: item.cgstRate ?? 0, // Use inventory item's CGST or default to 0
-        sgstRate: item.sgstRate ?? 0, // Use inventory item's SGST or default to 0
+        cgstRate: item.cgstRate ?? (organizationDetails?.gstNumber ? 9 : 0), 
+        sgstRate: item.sgstRate ?? (organizationDetails?.gstNumber ? 9 : 0), 
     });
     setShowInventoryPopover(false);
     setSearchTerm('');
@@ -209,7 +230,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
             control={form.control}
             name="customerAddress"
             render={({ field }) => (
-              <FormItem className="md:col-span-2">
+              <FormItem> {/* Removed md:col-span-2 to allow Status to sit beside it on md screens */}
                 <FormLabel>Customer Address</FormLabel>
                 <FormControl><Textarea placeholder="123 Main St, Anytown, USA" {...field} /></FormControl>
                 <FormMessage />
@@ -248,12 +269,12 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {fields.map((field, index) => (
-              <div key={field.id} className="grid grid-cols-1 sm:grid-cols-12 gap-2 p-3 border rounded-md items-end relative">
+              <div key={field.id} className="grid grid-cols-1 sm:grid-cols-[minmax(0,5fr)_minmax(0,1.5fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2 p-3 border rounded-md items-end relative">
                 <FormField
                   control={form.control}
                   name={`lineItems.${index}.itemName`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-5"> {/* Adjusted from sm:col-span-4 */}
+                    <FormItem>
                       {index === 0 && <FormLabel>Item Name</FormLabel>}
                        <Popover open={activeLineItemIndex === index && showInventoryPopover} onOpenChange={(open) => {
                          if (!open) {
@@ -290,7 +311,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                                     onClick={() => handleSelectInventoryItem(invItem, index)}
                                 >
                                     <p className="font-medium">{invItem.name}</p>
-                                    <p className="text-sm text-muted-foreground">{invItem.price.toFixed(2)}</p>
+                                    <p className="text-sm text-muted-foreground">{invItem.price?.toFixed(2) ?? '0.00'}</p>
                                 </div>
                                 ))
                             ) : (
@@ -307,9 +328,9 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.quantity`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2"> {/* Adjusted from sm:col-span-1 */}
+                    <FormItem>
                       {index === 0 && <FormLabel>Qty</FormLabel>}
-                      <Input type="number" placeholder="1" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" placeholder="1" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} className="w-full min-w-[60px]" />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -318,7 +339,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.price`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2"> {/* Unchanged */}
+                    <FormItem>
                       {index === 0 && <FormLabel>Price</FormLabel>}
                       <Input type="number" step="0.01" placeholder="0.00" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
@@ -329,8 +350,8 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.cgstRate`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-1"> {/* Adjusted from sm:col-span-2 */}
-                      {index === 0 && <FormLabel>CGST %</FormLabel>}
+                    <FormItem>
+                      {index === 0 && <FormLabel>CGST</FormLabel>} {/* Shorter Label */}
                       <Input type="number" step="0.01" placeholder="0" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
                     </FormItem>
@@ -340,16 +361,16 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.sgstRate`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-1"> {/* Adjusted from sm:col-span-2 */}
-                      {index === 0 && <FormLabel>SGST %</FormLabel>}
+                    <FormItem>
+                      {index === 0 && <FormLabel>SGST</FormLabel>} {/* Shorter Label */}
                       <Input type="number" step="0.01" placeholder="0" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="sm:col-span-1 flex items-end"> {/* Unchanged */}
+                <div className="flex items-end">
                   {fields.length > 1 && (
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:text-destructive">
+                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:text-destructive self-end mb-1"> {/* Adjusted margin for alignment */}
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   )}
@@ -359,7 +380,13 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
             <Button
               type="button"
               variant="outline"
-              onClick={() => append({ itemName: '', quantity: 1, price: 0, cgstRate: organizationDetails?.gstNumber ? 9 : 0, sgstRate: organizationDetails?.gstNumber ? 9 : 0 })}
+              onClick={() => append({ 
+                  itemName: '', 
+                  quantity: 1, 
+                  price: 0, 
+                  cgstRate: organizationDetails?.gstNumber ? 9 : 0, 
+                  sgstRate: organizationDetails?.gstNumber ? 9 : 0 
+              })}
               className="mt-2"
             >
               <PlusCircle className="mr-2 h-4 w-4" /> Add Item
