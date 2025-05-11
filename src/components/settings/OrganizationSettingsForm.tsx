@@ -24,8 +24,12 @@ const orgDetailsSchema = z.object({
   gstNumber: z.string().optional(),
   address: z.string().min(1, "Address is required"),
   contactDetails: z.string().min(1, "Contact details are required"),
-  invoiceHeaderColor: z.string().optional().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color"),
-  themeAccentColor: z.string().optional().regex(/^#[0-9a-fA-F]{6}$/, "Must be a valid hex color"),
+  invoiceHeaderColor: z.string()
+    .regex(/^(|#[0-9a-fA-F]{6})$/, "Must be a valid hex color (e.g. #RRGGBB) or empty to use default.")
+    .optional(),
+  themeAccentColor: z.string()
+    .regex(/^(|#[0-9a-fA-F]{6})$/, "Must be a valid hex color (e.g. #RRGGBB) or empty to use default.")
+    .optional(),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
@@ -76,7 +80,7 @@ export default function OrganizationSettingsForm() {
       reader.onloadend = () => {
         const base64String = reader.result as string;
         setLogoPreview(base64String);
-        form.setValue('companyLogo', base64String);
+        form.setValue('companyLogo', base64String, { shouldValidate: true });
       };
       reader.readAsDataURL(file);
     }
@@ -85,7 +89,13 @@ export default function OrganizationSettingsForm() {
   const onSubmit: SubmitHandler<OrgDetailsFormValues> = async (data) => {
     setIsSubmitting(true);
     try {
-      setOrganizationDetails(data);
+      // Ensure empty strings for colors are treated as undefined to trigger defaults if necessary
+      const processedData = {
+        ...data,
+        invoiceHeaderColor: data.invoiceHeaderColor === "" ? undefined : data.invoiceHeaderColor,
+        themeAccentColor: data.themeAccentColor === "" ? undefined : data.themeAccentColor,
+      };
+      setOrganizationDetails(processedData);
       logAction("Updated Organization Settings");
       toast({ title: "Settings Saved", description: "Your organization details have been updated." });
     } catch (error) {
@@ -135,7 +145,7 @@ export default function OrganizationSettingsForm() {
                 >
                 {logoPreview ? (
                     <div className="relative w-full h-32">
-                        <Image data-ai-hint="company logo" src={logoPreview} alt="Logo Preview" layout="fill" objectFit="contain" />
+                        <Image data-ai-hint="company logo" src={logoPreview} alt="Logo Preview" fill objectFit="contain" />
                     </div>
                 ) : (
                     <div className="space-y-1 text-center">
@@ -201,20 +211,20 @@ export default function OrganizationSettingsForm() {
                 name="invoiceHeaderColor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Invoice Header Color</FormLabel>
+                    <FormLabel>Invoice Header Color (Company Name)</FormLabel>
                     <FormControl>
                       <div className="flex items-center gap-2">
-                        <Input type="color" {...field} className="w-12 h-10 p-1" />
+                        <Input type="color" {...field} value={field.value || DEFAULT_INVOICE_HEADER_COLOR} className="w-12 h-10 p-1" />
                         <Input 
                           type="text" 
-                          value={field.value} 
+                          value={field.value || ''} 
                           onChange={field.onChange}
-                          placeholder="#739EDC"
+                          placeholder={DEFAULT_INVOICE_HEADER_COLOR}
                           className="w-32"
                         />
                       </div>
                     </FormControl>
-                    <FormDescription>Color for the company name on invoices.</FormDescription>
+                    <FormDescription>Color for the company name on invoices. Cleared uses default.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -224,20 +234,20 @@ export default function OrganizationSettingsForm() {
                 name="themeAccentColor"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Theme Accent Color</FormLabel>
+                    <FormLabel>Theme Accent Color (UI Elements)</FormLabel>
                     <FormControl>
                        <div className="flex items-center gap-2">
-                        <Input type="color" {...field} className="w-12 h-10 p-1" />
+                        <Input type="color" {...field} value={field.value || DEFAULT_THEME_ACCENT_COLOR} className="w-12 h-10 p-1" />
                          <Input 
                           type="text" 
-                          value={field.value} 
+                          value={field.value || ''} 
                           onChange={field.onChange}
-                          placeholder="#149E8E"
+                          placeholder={DEFAULT_THEME_ACCENT_COLOR}
                           className="w-32"
                         />
                       </div>
                     </FormControl>
-                    <FormDescription>Main accent color for UI elements.</FormDescription>
+                    <FormDescription>Main accent color for UI elements. Cleared uses default.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
