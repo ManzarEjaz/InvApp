@@ -3,18 +3,20 @@
 import InvoicePreview from "@/components/invoices/InvoicePreview";
 import { useAppState } from "@/contexts/AppStateContext";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { Invoice } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { Printer, ArrowLeft, AlertTriangle } from "lucide-react"; // Removed Edit icon
+import { Printer, ArrowLeft, AlertTriangle, Download } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
+import html2pdf from 'html2pdf.js';
 
 export default function PreviewInvoicePage() {
   const params = useParams();
   const router = useRouter();
   const { getInvoiceById } = useAppState();
   const [invoice, setInvoice] = useState<Invoice | null | undefined>(undefined);
+  const invoicePreviewRef = useRef<HTMLDivElement>(null);
 
   const invoiceId = typeof params.id === 'string' ? params.id : undefined;
 
@@ -27,8 +29,38 @@ export default function PreviewInvoicePage() {
     }
   }, [invoiceId, getInvoiceById, router]);
 
-  const handlePrint = () => {
-    window.print();
+  const handleDownloadPdf = () => {
+    if (invoice && invoicePreviewRef.current) {
+      const element = invoicePreviewRef.current;
+      const opt = {
+        margin: 0.5, // inches
+        filename: `invoice-${invoice.invoiceNumber}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true }, // useCORS true if there are external images like logo
+        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      };
+      
+      // Temporarily remove print-specific layout classes from the main app layout for PDF generation
+      // This is a workaround if html2pdf still picks up some layout styles
+      const appLayoutMain = document.querySelector('main.flex-1');
+      const originalMainClass = appLayoutMain?.className;
+      if (appLayoutMain) {
+        appLayoutMain.className = 'p-0 m-0 overflow-visible'; 
+      }
+
+      html2pdf().from(element).set(opt).save().then(() => {
+        // Restore original classes after PDF generation
+        if (appLayoutMain && originalMainClass) {
+          appLayoutMain.className = originalMainClass;
+        }
+      }).catch(err => {
+        console.error("Error generating PDF:", err);
+        // Restore original classes even if there's an error
+        if (appLayoutMain && originalMainClass) {
+          appLayoutMain.className = originalMainClass;
+        }
+      });
+    }
   };
 
   if (invoice === undefined) {
@@ -60,18 +92,20 @@ export default function PreviewInvoicePage() {
   }
 
   return (
-    <div className="space-y-6 print:!m-0 print:!p-0 print:!space-y-0">
-      <div className="flex flex-col sm:flex-row justify-between items-center print:hidden gap-2">
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-2">
         <Button variant="outline" onClick={() => router.back()}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
         <div className="flex gap-2">
-          <Button onClick={handlePrint}>
-            <Printer className="mr-2 h-4 w-4" /> Print Invoice
+          <Button onClick={handleDownloadPdf}>
+            <Download className="mr-2 h-4 w-4" /> Download PDF
           </Button>
         </div>
       </div>
-      <InvoicePreview invoice={invoice} />
+      <div ref={invoicePreviewRef}>
+        <InvoicePreview invoice={invoice} />
+      </div>
     </div>
   );
 }

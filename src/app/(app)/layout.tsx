@@ -51,13 +51,13 @@ export default function AppLayout({
   return (
     <SidebarProvider defaultOpen={true}>
         <ThemeApplicator />
-        <AppSidebar className="print:hidden" />
-        <SidebarRail className="print:hidden" />
+        <AppSidebar />
+        <SidebarRail />
         
-        <SidebarInset className="print:!p-0 print:!m-0 print:border-none print:shadow-none">
-            <AppHeader className="print:hidden" />
+        <SidebarInset>
+            <AppHeader />
             <main 
-                className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto print:!p-0 print:!m-0 print:overflow-visible"
+                className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto"
             >
                 {children}
             </main>
