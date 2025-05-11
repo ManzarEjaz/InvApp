@@ -1,5 +1,5 @@
-# Firebase Studio
+Hi This is my first VibeCode Project
 
-This is a NextJS starter in Firebase Studio.
+This is an Invoice generation project made under the time of 8 Hours with Basic knowledge of web app development. 
 
-To get started, take a look at src/app/page.tsx.
+[App Link](https://inv-app-manzarejazs-projects.vercel.app/dashboard)
