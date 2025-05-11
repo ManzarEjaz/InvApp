@@ -143,8 +143,8 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
         inventoryItemId: item.id,
         itemName: item.name,
         price: item.price,
-        cgstRate: item.cgstRate ?? (organizationDetails?.gstNumber ? 9 : 0),
-        sgstRate: item.sgstRate ?? (organizationDetails?.gstNumber ? 9 : 0),
+        cgstRate: item.cgstRate ?? 0, // Use inventory item's CGST or default to 0
+        sgstRate: item.sgstRate ?? 0, // Use inventory item's SGST or default to 0
     });
     setShowInventoryPopover(false);
     setSearchTerm('');
@@ -253,7 +253,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.itemName`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-4">
+                    <FormItem className="sm:col-span-5"> {/* Adjusted from sm:col-span-4 */}
                       {index === 0 && <FormLabel>Item Name</FormLabel>}
                        <Popover open={activeLineItemIndex === index && showInventoryPopover} onOpenChange={(open) => {
                          if (!open) {
@@ -307,7 +307,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.quantity`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-1">
+                    <FormItem className="sm:col-span-2"> {/* Adjusted from sm:col-span-1 */}
                       {index === 0 && <FormLabel>Qty</FormLabel>}
                       <Input type="number" placeholder="1" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
@@ -318,7 +318,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.price`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="sm:col-span-2"> {/* Unchanged */}
                       {index === 0 && <FormLabel>Price</FormLabel>}
                       <Input type="number" step="0.01" placeholder="0.00" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
@@ -329,9 +329,9 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.cgstRate`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="sm:col-span-1"> {/* Adjusted from sm:col-span-2 */}
                       {index === 0 && <FormLabel>CGST %</FormLabel>}
-                      <Input type="number" step="0.01" placeholder="9" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" step="0.01" placeholder="0" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
                     </FormItem>
                   )}
@@ -340,14 +340,14 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                   control={form.control}
                   name={`lineItems.${index}.sgstRate`}
                   render={({ field: itemField }) => (
-                    <FormItem className="sm:col-span-2">
+                    <FormItem className="sm:col-span-1"> {/* Adjusted from sm:col-span-2 */}
                       {index === 0 && <FormLabel>SGST %</FormLabel>}
-                      <Input type="number" step="0.01" placeholder="9" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
+                      <Input type="number" step="0.01" placeholder="0" {...itemField} onChange={e => itemField.onChange(parseFloat(e.target.value) || 0)} />
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <div className="sm:col-span-1 flex items-end">
+                <div className="sm:col-span-1 flex items-end"> {/* Unchanged */}
                   {fields.length > 1 && (
                     <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="text-destructive hover:text-destructive">
                       <Trash2 className="h-4 w-4" />
@@ -426,3 +426,4 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
     </Form>
   );
 }
+
