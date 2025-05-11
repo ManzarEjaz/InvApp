@@ -16,6 +16,7 @@ import type { OrganizationDetails } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
+import { cn } from '@/lib/utils'; // Added import for cn
 
 const orgDetailsSchema = z.object({
   companyName: z.string().min(1, "Company name is required"),
@@ -194,3 +195,4 @@ export default function OrganizationSettingsForm() {
     </Card>
   );
 }
+
