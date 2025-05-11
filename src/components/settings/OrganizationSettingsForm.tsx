@@ -24,7 +24,6 @@ const orgDetailsSchema = z.object({
   gstNumber: z.string().optional(),
   address: z.string().min(1, "Address is required"),
   contactDetails: z.string().min(1, "Contact details are required"),
-  invoiceFooterText: z.string().optional(),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
@@ -43,7 +42,6 @@ export default function OrganizationSettingsForm() {
       gstNumber: '',
       address: '',
       contactDetails: '',
-      invoiceFooterText: 'Thank you for your business!',
     },
   });
 
@@ -181,18 +179,6 @@ export default function OrganizationSettingsForm() {
                 <FormItem>
                   <FormLabel>Contact Details (Email, Phone)</FormLabel>
                   <FormControl><Input placeholder="contact@example.com / +1 555-1234" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="invoiceFooterText"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Invoice Footer Text (Optional)</FormLabel>
-                  <FormControl><Textarea placeholder="e.g., Thank you for your business! Payment is due upon receipt." {...field} rows={3} /></FormControl>
-                  <FormDescription>This text will appear at the bottom of your invoices.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

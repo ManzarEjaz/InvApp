@@ -41,7 +41,6 @@ const defaultOrgDetails: OrganizationDetails = {
   gstNumber: '',
   address: '',
   contactDetails: '',
-  invoiceFooterText: 'Thank you for your business!', // Default footer text
 };
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {

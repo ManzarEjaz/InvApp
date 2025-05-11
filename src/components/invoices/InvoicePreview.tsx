@@ -117,11 +117,7 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
         {/* Footer */}
         <div className="mt-12 pt-6 border-t text-center print:block">
-          {org.invoiceFooterText && org.invoiceFooterText.trim() !== '' ? (
-            <p className="text-xs text-muted-foreground whitespace-pre-line">{org.invoiceFooterText}</p>
-          ) : (
             <p className="text-xs text-muted-foreground">Thank you for your business!</p>
-          )}
           {(org.companyName || org.contactDetails) && 
             <p className="text-xs text-muted-foreground mt-1">
                 {org.companyName}{org.companyName && org.contactDetails && " - "}{org.contactDetails}
@@ -132,4 +128,3 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
     </Card>
   );
 }
-

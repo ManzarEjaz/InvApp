@@ -8,7 +8,6 @@ export interface OrganizationDetails {
   gstNumber: string;
   address: string;
   contactDetails: string; // Could be more structured: phone, email
-  invoiceFooterText?: string; // Custom text for the invoice footer
 }
 
 export interface InventoryItem {
@@ -65,4 +64,5 @@ export interface AppData {
   invoices: Invoice[];
   actionLog: ActionLogEntry[];
 }
+
 
