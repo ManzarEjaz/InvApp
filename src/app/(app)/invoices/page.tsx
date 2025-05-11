@@ -1,4 +1,3 @@
-
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -215,7 +214,7 @@ export default function InvoicesPage() {
                       <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                       <TableCell>{invoice.customerName}</TableCell>
                       <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
-                      <TableCell>{invoice.grandTotal.toFixed(2)}</TableCell>
+                      <TableCell>{(invoice.grandTotal ?? 0).toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={
                           invoice.status === 'paid' ? 'default' : 
@@ -282,4 +281,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-

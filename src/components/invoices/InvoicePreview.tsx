@@ -1,4 +1,3 @@
-
 "use client";
 import type { Invoice, OrganizationDetails } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -15,7 +14,7 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
   const org = invoice.organizationDetails;
 
   const getItemTotal = (item: Invoice['lineItems'][0]) => {
-    const basePrice = item.quantity * item.price;
+    const basePrice = (item.quantity || 0) * (item.price ?? 0);
     const cgstAmount = basePrice * ((item.cgstRate || 0) / 100);
     const sgstAmount = basePrice * ((item.sgstRate || 0) / 100);
     return basePrice + cgstAmount + sgstAmount;
@@ -71,8 +70,8 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                 <TableHead className="w-1/2">Item Description</TableHead>
                 <TableHead className="text-center">Qty</TableHead>
                 <TableHead className="text-right">Unit Price</TableHead>
-                <TableHead className="text-center">CGST (%)</TableHead>
-                <TableHead className="text-center">SGST (%)</TableHead>
+                <TableHead className="text-center pb-1">CGST (%)</TableHead>
+                <TableHead className="text-center pb-1">SGST (%)</TableHead>
                 <TableHead className="text-right">Total</TableHead>
               </TableRow>
             </TableHeader>
@@ -81,7 +80,7 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                 <TableRow key={item.id}>
                   <TableCell>{item.itemName}</TableCell>
                   <TableCell className="text-center">{item.quantity}</TableCell>
-                  <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{(item.price ?? 0).toFixed(2)}</TableCell>
                   <TableCell className="text-center">{(item.cgstRate || 0).toFixed(2)}%</TableCell>
                   <TableCell className="text-center">{(item.sgstRate || 0).toFixed(2)}%</TableCell>
                   <TableCell className="text-right">{getItemTotal(item).toFixed(2)}</TableCell>
@@ -96,22 +95,22 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           <div className="w-full max-w-xs space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Subtotal:</span>
-              <span className="text-sm text-foreground">{invoice.subTotal.toFixed(2)}</span>
+              <span className="text-sm text-foreground">{(invoice.subTotal ?? 0).toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Tax (CGST + SGST):</span>
-              <span className="text-sm text-foreground">{invoice.totalTax.toFixed(2)}</span>
+              <span className="text-sm text-foreground">{(invoice.totalTax ?? 0).toFixed(2)}</span>
             </div>
-            {invoice.discountAmount > 0 && (
+            {(invoice.discountAmount ?? 0) > 0 && (
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Discount:</span>
-                <span className="text-sm text-foreground">-{invoice.discountAmount.toFixed(2)}</span>
+                <span className="text-sm text-foreground">-{(invoice.discountAmount ?? 0).toFixed(2)}</span>
               </div>
             )}
             <hr className="my-1 border-border"/>
             <div className="flex justify-between font-bold text-lg">
               <span className="text-foreground">Grand Total:</span>
-              <span className="text-foreground">{invoice.grandTotal.toFixed(2)}</span>
+              <span className="text-foreground">{(invoice.grandTotal ?? 0).toFixed(2)}</span>
             </div>
           </div>
         </div>
@@ -137,4 +136,3 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
     </Card>
   );
 }
-
