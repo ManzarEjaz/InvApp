@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,10 +38,11 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 
 const inventoryItemSchema = z.object({
   name: z.string().min(1, "Item name is required"),
-  price: z.number().min(0, "Price cannot be negative"),
+  price: z.number().min(0, "Price cannot be negative"), // Price before tax
+  finalPrice: z.number().min(0, "Final price cannot be negative"), // Price after tax
   quantity: z.number().min(0, "Quantity cannot be negative").int("Quantity must be a whole number"),
-  cgstRate: z.number().min(0).max(100).optional(),
-  sgstRate: z.number().min(0).max(100).optional(),
+  cgstRate: z.number().min(0).max(100).optional().default(0),
+  sgstRate: z.number().min(0).max(100).optional().default(0),
   description: z.string().optional(),
 });
 type InventoryItemFormValues = z.infer<typeof inventoryItemSchema>;
@@ -51,43 +52,127 @@ export default function InventoryPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AppInventoryItem | null>(null);
+  const [lastEditedField, setLastEditedField] = useState<'price' | 'finalPrice' | null>(null);
   const { toast } = useToast();
 
   const form = useForm<InventoryItemFormValues>({
     resolver: zodResolver(inventoryItemSchema),
+    // Default values will be set in useEffect based on isFormOpen and editingItem
   });
 
-  React.useEffect(() => {
-    if (editingItem) {
-      form.reset({
-        name: editingItem.name,
-        price: editingItem.price,
-        quantity: editingItem.quantity,
-        cgstRate: editingItem.cgstRate,
-        sgstRate: editingItem.sgstRate,
-        description: editingItem.description,
-      });
-    } else {
-      form.reset({ name: '', price: 0, quantity: 0, cgstRate: 0, sgstRate: 0, description: '' });
+  const { watch, setValue, getValues, reset } = form;
+
+  const watchedPrice = watch('price');
+  const watchedFinalPrice = watch('finalPrice');
+  const watchedCgstRate = watch('cgstRate');
+  const watchedSgstRate = watch('sgstRate');
+
+  // Effect for initializing form when dialog opens or editingItem changes
+  useEffect(() => {
+    if (isFormOpen) {
+      let defaultValues: InventoryItemFormValues;
+      if (editingItem) {
+        const p = editingItem.price;
+        const cgst = editingItem.cgstRate || 0;
+        const sgst = editingItem.sgstRate || 0;
+        const totalTaxRate = (cgst / 100) + (sgst / 100);
+        const calculatedFinalPrice = parseFloat((p * (1 + totalTaxRate)).toFixed(2));
+        defaultValues = {
+          name: editingItem.name,
+          price: p,
+          quantity: editingItem.quantity ?? 0,
+          cgstRate: cgst,
+          sgstRate: sgst,
+          description: editingItem.description || '',
+          finalPrice: calculatedFinalPrice,
+        };
+      } else {
+        // Default for new item
+        const initialPrice = 0;
+        const initialCgst = 0;
+        const initialSgst = 0;
+        const initialFinalPrice = parseFloat((initialPrice * (1 + (initialCgst / 100) + (initialSgst / 100))).toFixed(2));
+        defaultValues = {
+          name: '',
+          price: initialPrice,
+          quantity: 0,
+          cgstRate: initialCgst,
+          sgstRate: initialSgst,
+          description: '',
+          finalPrice: initialFinalPrice,
+        };
+      }
+      reset(defaultValues);
+      setLastEditedField(null); 
     }
-  }, [editingItem, form, isFormOpen]);
+  }, [editingItem, reset, isFormOpen]);
+
+
+  // Calculate finalPrice when price or tax rates change
+  useEffect(() => {
+    if (!isFormOpen || lastEditedField === 'finalPrice') return;
+
+    const currentPrice = getValues('price');
+    const currentCgst = getValues('cgstRate');
+    const currentSgst = getValues('sgstRate');
+
+    const p = typeof currentPrice === 'number' ? currentPrice : 0;
+    const cgst = typeof currentCgst === 'number' ? currentCgst : 0;
+    const sgst = typeof currentSgst === 'number' ? currentSgst : 0;
+
+    const totalTaxRate = (cgst / 100) + (sgst / 100);
+    const newFinalPrice = parseFloat((p * (1 + totalTaxRate)).toFixed(2));
+    
+    const currentFinalPriceValue = getValues('finalPrice');
+    if (typeof currentFinalPriceValue !== 'number' || Math.abs(currentFinalPriceValue - newFinalPrice) > 0.001) {
+      setValue('finalPrice', newFinalPrice, { shouldValidate: true });
+    }
+  }, [watchedPrice, watchedCgstRate, watchedSgstRate, setValue, getValues, lastEditedField, isFormOpen]);
+
+  // Calculate price when finalPrice or tax rates change (and finalPrice was the last edited)
+  useEffect(() => {
+    if (!isFormOpen || lastEditedField !== 'finalPrice') return;
+
+    const currentFinalPrice = getValues('finalPrice');
+    const currentCgst = getValues('cgstRate');
+    const currentSgst = getValues('sgstRate');
+    
+    const fp = typeof currentFinalPrice === 'number' ? currentFinalPrice : 0;
+    const cgst = typeof currentCgst === 'number' ? currentCgst : 0;
+    const sgst = typeof currentSgst === 'number' ? currentSgst : 0;
+
+    const totalTaxRate = (cgst / 100) + (sgst / 100);
+    let newPrice = 0;
+    if (1 + totalTaxRate !== 0) {
+      newPrice = parseFloat((fp / (1 + totalTaxRate)).toFixed(2));
+    }
+    
+    const currentPriceValue = getValues('price');
+    if (typeof currentPriceValue !== 'number' || Math.abs(currentPriceValue - newPrice) > 0.001) {
+      setValue('price', newPrice, { shouldValidate: true });
+    }
+  }, [watchedFinalPrice, watchedCgstRate, watchedSgstRate, setValue, getValues, lastEditedField, isFormOpen]);
+
 
   const filteredInventory = inventory.map(item => ({
     ...item,
-    quantity: item.quantity ?? 0, // Ensure quantity is not undefined for display
+    quantity: item.quantity ?? 0, 
   })).filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleFormSubmit: SubmitHandler<InventoryItemFormValues> = (data) => {
+    // We store 'price' (before tax), 'finalPrice' is for form calculation only.
+    const { finalPrice, ...itemDataToStore } = data; 
+
     if (editingItem) {
-      updateInventoryItem({ ...editingItem, ...data });
-      logAction(`Updated inventory item: ${data.name}`);
-      toast({ title: "Item Updated", description: `${data.name} has been updated.` });
+      updateInventoryItem({ ...editingItem, ...itemDataToStore });
+      logAction(`Updated inventory item: ${itemDataToStore.name}`);
+      toast({ title: "Item Updated", description: `${itemDataToStore.name} has been updated.` });
     } else {
-      addInventoryItem(data);
-      logAction(`Added inventory item: ${data.name}`);
-      toast({ title: "Item Added", description: `${data.name} has been added to inventory.` });
+      addInventoryItem(itemDataToStore);
+      logAction(`Added inventory item: ${itemDataToStore.name}`);
+      toast({ title: "Item Added", description: `${itemDataToStore.name} has been added to inventory.` });
     }
     setIsFormOpen(false);
     setEditingItem(null);
@@ -116,7 +201,10 @@ export default function InventoryPage() {
           <h1 className="text-3xl font-bold tracking-tight">Inventory Management</h1>
           <p className="text-muted-foreground">Add, edit, and manage your products and services.</p>
         </div>
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <Dialog open={isFormOpen} onOpenChange={(isOpen) => {
+            setIsFormOpen(isOpen);
+            if (!isOpen) setEditingItem(null); // Reset editing item when dialog closes
+        }}>
           <DialogTrigger asChild>
             <Button onClick={openNewForm}>
               <PlusCircle className="mr-2 h-5 w-5" /> Add New Item
@@ -149,18 +237,40 @@ export default function InventoryPage() {
                     render={({ field }) => (
                         <FormItem>
                         <FormLabel>Price (before tax)</FormLabel>
-                        <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                        <FormControl><Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            {...field} 
+                            onChange={e => {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                                setLastEditedField('price');
+                            }}
+                            onFocus={() => setLastEditedField('price')}
+                             />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                     />
                     <FormField
                     control={form.control}
-                    name="quantity"
+                    name="finalPrice"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>Quantity in Stock</FormLabel>
-                        <FormControl><Input type="number" step="1" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl>
+                        <FormLabel>Final Price (incl. tax)</FormLabel>
+                        <FormControl><Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="0.00" 
+                            {...field} 
+                            onChange={e => {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                                setLastEditedField('finalPrice');
+                            }}
+                            onFocus={() => setLastEditedField('finalPrice')}
+                            />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
@@ -169,26 +279,66 @@ export default function InventoryPage() {
                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                     control={form.control}
-                    name="cgstRate"
+                    name="quantity"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>CGST Rate (%)</FormLabel>
-                        <FormControl><Input type="number" step="0.01" placeholder="e.g., 9" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                        <FormLabel>Quantity in Stock</FormLabel>
+                        <FormControl><Input 
+                            type="number" 
+                            step="1" 
+                            placeholder="0" 
+                            {...field} 
+                            onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                     />
                     <FormField
                     control={form.control}
-                    name="sgstRate"
+                    name="cgstRate"
                     render={({ field }) => (
                         <FormItem>
-                        <FormLabel>SGST Rate (%)</FormLabel>
-                        <FormControl><Input type="number" step="0.01" placeholder="e.g., 9" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)}/></FormControl>
+                        <FormLabel>CGST Rate (%)</FormLabel>
+                        <FormControl><Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="e.g., 9" 
+                            {...field} 
+                            onChange={e => {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                                setLastEditedField(null); // Recalculate finalPrice from price
+                            }}
+                            />
+                        </FormControl>
                         <FormMessage />
                         </FormItem>
                     )}
                     />
+                 </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="sgstRate"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>SGST Rate (%)</FormLabel>
+                        <FormControl><Input 
+                            type="number" 
+                            step="0.01" 
+                            placeholder="e.g., 9" 
+                            {...field} 
+                            onChange={e => {
+                                field.onChange(parseFloat(e.target.value) || 0);
+                                setLastEditedField(null); // Recalculate finalPrice from price
+                            }}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                     {/* Empty cell for layout consistency if needed */}
                  </div>
                 <FormField
                   control={form.control}
@@ -247,7 +397,7 @@ export default function InventoryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Price</TableHead>
+                  <TableHead>Price (before tax)</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>CGST %</TableHead>
                   <TableHead>SGST %</TableHead>
@@ -306,3 +456,4 @@ export default function InventoryPage() {
     </div>
   );
 }
+
