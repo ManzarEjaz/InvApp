@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppState } from "@/contexts/AppStateContext";
 import Link from "next/link";
-import { PlusCircle, Edit3, Eye, Trash2, Search, FileText } from "lucide-react"; // Added FileText
+import { PlusCircle, Edit3, Eye, Trash2, Search, FileText, Printer, Loader2 } from "lucide-react"; // Added Printer, Loader2
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import type { Invoice } from "@/lib/types";
 import {
   AlertDialog,
@@ -22,11 +22,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import InvoicePreview from "@/components/invoices/InvoicePreview"; // For direct print
+import html2pdf from 'html2pdf.js';
+import * as ReactDOMClient from 'react-dom/client'; // For React 18 rendering
 
 export default function InvoicesPage() {
   const { invoices, deleteInvoice, logAction } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
+  const [isPrinting, setIsPrinting] = useState<string | null>(null); // Tracks printing state by invoice ID
 
   const filteredInvoices = invoices.filter(invoice => 
     invoice.invoiceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -38,6 +42,117 @@ export default function InvoicesPage() {
     logAction(`Deleted invoice ${invoiceNumber}`);
     toast({ title: "Invoice Deleted", description: `Invoice ${invoiceNumber} has been deleted.`});
   };
+
+  const commonPdfOptions = (invoiceNumber: string) => ({
+    margin: 0.5, // inches
+    filename: `invoice-${invoiceNumber}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
+    jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+  });
+
+  const handleDirectPrint = async (invoiceToPrint: Invoice) => {
+    if (!invoiceToPrint || isPrinting === invoiceToPrint.id) return;
+    setIsPrinting(invoiceToPrint.id);
+
+    const printContainer = document.createElement('div');
+    printContainer.style.position = 'fixed';
+    printContainer.style.left = '-9999px'; // Off-screen
+    printContainer.style.top = '-9999px';
+    // Ensure the container itself is large enough not to constrain its content initially
+    printContainer.style.width = '210mm'; // A4 width, approx
+    printContainer.style.height = '297mm'; // A4 height, approx
+    document.body.appendChild(printContainer);
+
+    let reactRoot: ReactDOMClient.Root | null = null;
+    if (typeof ReactDOMClient.createRoot === 'function') {
+        reactRoot = ReactDOMClient.createRoot(printContainer);
+        reactRoot.render(<InvoicePreview invoice={invoiceToPrint} />);
+    } else {
+        // Fallback for older React, though project uses 18
+        toast({ title: "Print Error", description: "Unsupported React version for printing.", variant: "destructive" });
+        if (printContainer) document.body.removeChild(printContainer);
+        setIsPrinting(null);
+        return;
+    }
+    
+
+    // Wait for the component to render.
+    await new Promise(resolve => setTimeout(resolve, 500)); 
+
+    const opt = commonPdfOptions(invoiceToPrint.invoiceNumber);
+    let blobUrl = '';
+
+    // Temporarily adjust layout for PDF generation
+    const appLayoutMain = document.querySelector('main.flex-1');
+    let originalMainClass: string | undefined;
+    if (appLayoutMain) {
+      originalMainClass = appLayoutMain.className;
+      appLayoutMain.className = 'p-0 m-0 overflow-visible';
+    }
+
+    try {
+      // Ensure there is content to print
+      const contentToPrint = printContainer.firstChild;
+      if (!contentToPrint) {
+        throw new Error("Invoice content not found for printing.");
+      }
+
+      const pdfBlob = await html2pdf().from(contentToPrint).set(opt).output('blob');
+      blobUrl = URL.createObjectURL(pdfBlob);
+
+      const printWindow = window.open(blobUrl, '_blank');
+      if (printWindow) {
+        printWindow.onload = () => {
+          try {
+            if (!printWindow.closed) {
+              printWindow.focus();
+              printWindow.print();
+            }
+          } catch (e) {
+            console.error("Error initiating print in new window (onload):", e);
+            toast({
+              title: "Print Ready",
+              description: "Invoice opened. Use browser's print (Ctrl/Cmd+P).",
+            });
+          }
+        };
+         setTimeout(() => {
+            if (printWindow && !printWindow.closed) {
+                try {
+                    if (typeof printWindow.print === 'function') {
+                        printWindow.focus();
+                        printWindow.print();
+                    }
+                } catch (e) {
+                     console.error("Error initiating print in new window (timeout fallback):", e);
+                     if (!toast.toasts.find(t => t.title === "Print Ready")) {
+                        toast({
+                            title: "Print Ready",
+                            description: "Invoice opened. Use browser's print (Ctrl/Cmd+P).",
+                        });
+                     }
+                }
+            }
+        }, 1200);
+      } else {
+        toast({ title: "Print Error", description: "Could not open print window. Check pop-up blocker.", variant: "destructive" });
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
+      }
+    } catch (error) {
+      console.error('Error generating or printing PDF:', error);
+      toast({ title: "Print Error", description: `Failed: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+    } finally {
+      if (appLayoutMain && originalMainClass !== undefined) {
+        appLayoutMain.className = originalMainClass;
+      }
+      if (reactRoot) reactRoot.unmount();
+      if (printContainer) document.body.removeChild(printContainer);
+      setIsPrinting(null);
+    }
+  };
+
 
   return (
     <div className="space-y-6">
@@ -113,12 +228,21 @@ export default function InvoicesPage() {
                           {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button variant="ghost" size="icon" asChild title="View/Print">
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" asChild title="View">
                           <Link href={`/invoices/${invoice.id}/preview`}><Eye className="h-4 w-4" /></Link>
                         </Button>
                         <Button variant="ghost" size="icon" asChild title="Edit">
                           <Link href={`/invoices/${invoice.id}/edit`}><Edit3 className="h-4 w-4" /></Link>
+                        </Button>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleDirectPrint(invoice)} 
+                            disabled={isPrinting === invoice.id}
+                            title="Print Invoice"
+                        >
+                          {isPrinting === invoice.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                         </Button>
                         <AlertDialog>
                           <AlertDialogTrigger asChild>
@@ -158,3 +282,4 @@ export default function InvoicesPage() {
     </div>
   );
 }
+
