@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppState } from "@/contexts/AppStateContext";
 import Link from "next/link";
-import { PlusCircle, Edit3, Eye, Trash2, Search } from "lucide-react";
+import { PlusCircle, Edit3, Eye, Trash2, Search, FileText } from "lucide-react"; // Added FileText
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -100,7 +100,7 @@ export default function InvoicesPage() {
                       <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
                       <TableCell>{invoice.customerName}</TableCell>
                       <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
-                      <TableCell>${invoice.grandTotal.toFixed(2)}</TableCell>
+                      <TableCell>{invoice.grandTotal.toFixed(2)}</TableCell>
                       <TableCell>
                         <Badge variant={
                           invoice.status === 'paid' ? 'default' : 

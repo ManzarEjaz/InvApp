@@ -14,6 +14,7 @@ export interface InventoryItem {
   id: string;
   name: string;
   price: number; // Price before tax
+  quantity: number; // Quantity in stock
   // Default taxes, can be overridden at invoice line item level
   cgstRate?: number; // Percentage, e.g., 9 for 9%
   sgstRate?: number; // Percentage, e.g., 9 for 9%

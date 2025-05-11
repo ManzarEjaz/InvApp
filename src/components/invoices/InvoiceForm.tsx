@@ -97,8 +97,8 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
     lineItems.forEach(item => {
       const itemTotal = item.quantity * item.price;
       subTotal += itemTotal;
-      const cgst = itemTotal * (item.cgstRate / 100);
-      const sgst = itemTotal * (item.sgstRate / 100);
+      const cgst = itemTotal * ((item.cgstRate || 0) / 100);
+      const sgst = itemTotal * ((item.sgstRate || 0) / 100);
       totalTax += cgst + sgst;
     });
     const grandTotal = subTotal + totalTax - discount;
@@ -290,7 +290,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                                     onClick={() => handleSelectInventoryItem(invItem, index)}
                                 >
                                     <p className="font-medium">{invItem.name}</p>
-                                    <p className="text-sm text-muted-foreground">${invItem.price.toFixed(2)}</p>
+                                    <p className="text-sm text-muted-foreground">{invItem.price.toFixed(2)}</p>
                                 </div>
                                 ))
                             ) : (
@@ -382,11 +382,11 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
             <div className="space-y-2 rounded-md border p-4 md:col-span-1">
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Subtotal:</span>
-                    <span>${totals.subTotal.toFixed(2)}</span>
+                    <span>{totals.subTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Tax:</span>
-                    <span>${totals.totalTax.toFixed(2)}</span>
+                    <span>{totals.totalTax.toFixed(2)}</span>
                 </div>
                  <FormField
                     control={form.control}
@@ -410,7 +410,7 @@ export default function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
                 <hr className="my-2"/>
                 <div className="flex justify-between font-semibold text-lg">
                     <span>Grand Total:</span>
-                    <span>${totals.grandTotal.toFixed(2)}</span>
+                    <span>{totals.grandTotal.toFixed(2)}</span>
                 </div>
             </div>
         </div>

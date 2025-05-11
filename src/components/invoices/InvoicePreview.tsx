@@ -14,8 +14,8 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
 
   const getItemTotal = (item: Invoice['lineItems'][0]) => {
     const basePrice = item.quantity * item.price;
-    const cgstAmount = basePrice * (item.cgstRate / 100);
-    const sgstAmount = basePrice * (item.sgstRate / 100);
+    const cgstAmount = basePrice * ((item.cgstRate || 0) / 100);
+    const sgstAmount = basePrice * ((item.sgstRate || 0) / 100);
     return basePrice + cgstAmount + sgstAmount;
   };
 
@@ -72,10 +72,10 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
                 <TableRow key={item.id}>
                   <TableCell>{item.itemName}</TableCell>
                   <TableCell className="text-center">{item.quantity}</TableCell>
-                  <TableCell className="text-right">${item.price.toFixed(2)}</TableCell>
-                  <TableCell className="text-center">{item.cgstRate.toFixed(2)}%</TableCell>
-                  <TableCell className="text-center">{item.sgstRate.toFixed(2)}%</TableCell>
-                  <TableCell className="text-right">${getItemTotal(item).toFixed(2)}</TableCell>
+                  <TableCell className="text-right">{item.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-center">{(item.cgstRate || 0).toFixed(2)}%</TableCell>
+                  <TableCell className="text-center">{(item.sgstRate || 0).toFixed(2)}%</TableCell>
+                  <TableCell className="text-right">{getItemTotal(item).toFixed(2)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -87,22 +87,22 @@ export default function InvoicePreview({ invoice }: InvoicePreviewProps) {
           <div className="w-full max-w-xs space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Subtotal:</span>
-              <span className="text-sm text-foreground">${invoice.subTotal.toFixed(2)}</span>
+              <span className="text-sm text-foreground">{invoice.subTotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Total Tax (CGST + SGST):</span>
-              <span className="text-sm text-foreground">${invoice.totalTax.toFixed(2)}</span>
+              <span className="text-sm text-foreground">{invoice.totalTax.toFixed(2)}</span>
             </div>
             {invoice.discountAmount > 0 && (
               <div className="flex justify-between">
                 <span className="text-sm text-muted-foreground">Discount:</span>
-                <span className="text-sm text-foreground">-${invoice.discountAmount.toFixed(2)}</span>
+                <span className="text-sm text-foreground">-{invoice.discountAmount.toFixed(2)}</span>
               </div>
             )}
             <hr className="my-1 border-border"/>
             <div className="flex justify-between font-bold text-lg">
               <span className="text-foreground">Grand Total:</span>
-              <span className="text-foreground">${invoice.grandTotal.toFixed(2)}</span>
+              <span className="text-foreground">{invoice.grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>

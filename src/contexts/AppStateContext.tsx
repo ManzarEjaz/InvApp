@@ -48,9 +48,19 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     ORG_DETAILS_STORAGE_KEY,
     defaultOrgDetails
   );
-  const [inventory, setInventoryStorage] = useLocalStorage<InventoryItem[]>(INVENTORY_STORAGE_KEY, []);
+  
+  const [rawInventory, setInventoryStorage] = useLocalStorage<InventoryItem[]>(INVENTORY_STORAGE_KEY, []);
   const [invoices, setInvoicesStorage] = useLocalStorage<Invoice[]>(INVOICES_STORAGE_KEY, []);
   const [actionLog, setActionLogStorage] = useLocalStorage<ActionLogEntry[]>(ACTION_LOG_STORAGE_KEY, []);
+
+  // Ensure inventory items always have a quantity (for items loaded from older local storage)
+  const inventory = React.useMemo(() => {
+    return rawInventory.map(item => ({
+      ...item,
+      quantity: item.quantity ?? 0, // Default to 0 if quantity is undefined
+    }));
+  }, [rawInventory]);
+
 
   const setOrganizationDetails = (details: OrganizationDetails) => {
     setOrgDetailsStorage(details);
@@ -59,14 +69,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   // Inventory Management
   const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
-    const newItem = { ...item, id: uuidv4() };
+    const newItem = { ...item, id: uuidv4(), quantity: item.quantity ?? 0 };
     setInventoryStorage(prev => [...prev, newItem]);
     logAction("Added Inventory Item", { name: newItem.name, id: newItem.id });
   };
 
   const updateInventoryItem = (updatedItem: InventoryItem) => {
-    setInventoryStorage(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
-    logAction("Updated Inventory Item", { name: updatedItem.name, id: updatedItem.id });
+    const itemWithQuantity = { ...updatedItem, quantity: updatedItem.quantity ?? 0 };
+    setInventoryStorage(prev => prev.map(item => item.id === itemWithQuantity.id ? itemWithQuantity : item));
+    logAction("Updated Inventory Item", { name: itemWithQuantity.name, id: itemWithQuantity.id });
   };
 
   const deleteInventoryItem = (itemId: string) => {

@@ -39,6 +39,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 const inventoryItemSchema = z.object({
   name: z.string().min(1, "Item name is required"),
   price: z.number().min(0, "Price cannot be negative"),
+  quantity: z.number().min(0, "Quantity cannot be negative").int("Quantity must be a whole number"),
   cgstRate: z.number().min(0).max(100).optional(),
   sgstRate: z.number().min(0).max(100).optional(),
   description: z.string().optional(),
@@ -61,16 +62,20 @@ export default function InventoryPage() {
       form.reset({
         name: editingItem.name,
         price: editingItem.price,
+        quantity: editingItem.quantity,
         cgstRate: editingItem.cgstRate,
         sgstRate: editingItem.sgstRate,
         description: editingItem.description,
       });
     } else {
-      form.reset({ name: '', price: 0, cgstRate: 0, sgstRate: 0, description: '' });
+      form.reset({ name: '', price: 0, quantity: 0, cgstRate: 0, sgstRate: 0, description: '' });
     }
   }, [editingItem, form, isFormOpen]);
 
-  const filteredInventory = inventory.filter(item =>
+  const filteredInventory = inventory.map(item => ({
+    ...item,
+    quantity: item.quantity ?? 0, // Ensure quantity is not undefined for display
+  })).filter(item =>
     item.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -137,17 +142,30 @@ export default function InventoryPage() {
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="price"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Price (before tax)</FormLabel>
-                      <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                    control={form.control}
+                    name="price"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Price (before tax)</FormLabel>
+                        <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                    <FormField
+                    control={form.control}
+                    name="quantity"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Quantity in Stock</FormLabel>
+                        <FormControl><Input type="number" step="1" placeholder="0" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} /></FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                </div>
                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                     control={form.control}
@@ -230,6 +248,7 @@ export default function InventoryPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Price</TableHead>
+                  <TableHead>Quantity</TableHead>
                   <TableHead>CGST %</TableHead>
                   <TableHead>SGST %</TableHead>
                   <TableHead>Description</TableHead>
@@ -240,7 +259,8 @@ export default function InventoryPage() {
                 {filteredInventory.map((item) => (
                   <TableRow key={item.id}>
                     <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell>${item.price.toFixed(2)}</TableCell>
+                    <TableCell>{item.price.toFixed(2)}</TableCell>
+                    <TableCell>{item.quantity}</TableCell>
                     <TableCell>{item.cgstRate !== undefined ? `${item.cgstRate.toFixed(2)}%` : 'N/A'}</TableCell>
                     <TableCell>{item.sgstRate !== undefined ? `${item.sgstRate.toFixed(2)}%` : 'N/A'}</TableCell>
                     <TableCell className="max-w-xs truncate text-sm text-muted-foreground">{item.description || "-"}</TableCell>
