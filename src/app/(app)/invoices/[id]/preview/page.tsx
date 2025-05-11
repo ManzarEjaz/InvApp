@@ -1,4 +1,3 @@
-
 "use client";
 import InvoicePreview from "@/components/invoices/InvoicePreview";
 import { useAppState } from "@/contexts/AppStateContext";
@@ -10,6 +9,7 @@ import { Printer, ArrowLeft, AlertTriangle, Download } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import html2pdf from 'html2pdf.js';
+import { useToast } from "@/hooks/use-toast";
 
 export default function PreviewInvoicePage() {
   const params = useParams();
@@ -17,6 +17,7 @@ export default function PreviewInvoicePage() {
   const { getInvoiceById } = useAppState();
   const [invoice, setInvoice] = useState<Invoice | null | undefined>(undefined);
   const invoicePreviewRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const invoiceId = typeof params.id === 'string' ? params.id : undefined;
 
@@ -63,49 +64,78 @@ export default function PreviewInvoicePage() {
           await html2pdf().from(element).set(opt).save();
         } catch (err) {
           console.error("Error generating PDF for download:", err);
+          toast({ title: "Download Error", description: "Failed to generate PDF for download.", variant: "destructive" });
         }
       });
     }
   };
 
   const handlePrintPdf = async () => {
-    if (invoice && invoicePreviewRef.current) {
-      const element = invoicePreviewRef.current;
-      const opt = commonPdfOptions(invoice.invoiceNumber);
-      
-      await withTemporaryLayoutChange(async () => {
-        try {
-          const blobUrl = await html2pdf().from(element).set(opt).output('bloburl');
-          
-          const iframe = document.createElement('iframe');
-          iframe.style.display = 'none';
-          iframe.src = blobUrl;
-          document.body.appendChild(iframe);
+    if (!invoice || !invoicePreviewRef.current) return;
 
-          iframe.onload = () => {
-            setTimeout(() => { // Ensure PDF is rendered in iframe
-              try {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-              } catch(printError) {
-                console.error("Error during printing:", printError);
-                // Fallback or user notification can be added here
-              } finally {
-                document.body.removeChild(iframe);
-                URL.revokeObjectURL(blobUrl);
+    const element = invoicePreviewRef.current;
+    const opt = commonPdfOptions(invoice.invoiceNumber);
+    let blobUrl = ''; // Keep blobUrl in a broader scope for cleanup
+
+    await withTemporaryLayoutChange(async () => {
+      try {
+        blobUrl = await html2pdf().from(element).set(opt).output('bloburl');
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.display = 'none'; // Keep it hidden
+
+        // It's generally better to set up handlers before src
+        iframe.onload = () => {
+          setTimeout(() => { // Ensure PDF is rendered in iframe
+            try {
+              if (iframe.contentWindow && typeof iframe.contentWindow.print === 'function') {
+                iframe.contentWindow.focus(); // Focus the iframe's content window
+                iframe.contentWindow.print(); // Trigger print dialog
+              } else {
+                console.error("Print Error: Iframe content window or print function not available.");
+                toast({ title: "Print Error", description: "Failed to prepare document for printing.", variant: "destructive" });
               }
-            }, 250); // Adjusted timeout for rendering
-          };
-          iframe.onerror = (err) => {
-            console.error("Error loading PDF into iframe:", err);
+            } catch (printError) {
+              console.error("Error during printing:", printError);
+              toast({ title: "Print Error", description: "Could not initiate printing.", variant: "destructive" });
+            } finally {
+              // Cleanup iframe and blob URL
+              // Use a timeout to ensure print dialog isn't interrupted
+              setTimeout(() => {
+                if (document.body.contains(iframe)) {
+                  document.body.removeChild(iframe);
+                }
+                if (blobUrl) { 
+                  URL.revokeObjectURL(blobUrl);
+                }
+              }, 1000); // Delay cleanup slightly
+            }
+          }, 500); // Timeout for PDF rendering in iframe
+        };
+
+        iframe.onerror = (errEvt) => {
+          // errEvt could be an Event or string depending on browser
+          console.error("Error loading PDF into iframe:", errEvt);
+          toast({ title: "Print Error", description: "Failed to load PDF for printing.", variant: "destructive" });
+          if (document.body.contains(iframe)) {
             document.body.removeChild(iframe);
+          }
+          if (blobUrl) {
             URL.revokeObjectURL(blobUrl);
           }
-        } catch (err) {
-          console.error("Error generating PDF for printing:", err);
+        };
+        
+        iframe.src = blobUrl;
+        document.body.appendChild(iframe);
+
+      } catch (err) {
+        console.error("Error generating PDF for printing:", err);
+        toast({ title: "PDF Error", description: "Failed to generate PDF for printing.", variant: "destructive" });
+        if (blobUrl) { // If blobUrl was created before an error in iframe handling
+          URL.revokeObjectURL(blobUrl);
         }
-      });
-    }
+      }
+    });
   };
 
 
@@ -159,4 +189,3 @@ export default function PreviewInvoicePage() {
     </div>
   );
 }
-
