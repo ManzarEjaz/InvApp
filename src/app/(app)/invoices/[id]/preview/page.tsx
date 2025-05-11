@@ -1,3 +1,4 @@
+
 "use client";
 import InvoicePreview from "@/components/invoices/InvoicePreview";
 import { useAppState } from "@/contexts/AppStateContext";
@@ -34,24 +35,27 @@ export default function PreviewInvoicePage() {
     margin: 0.5, // inches
     filename: `invoice-${invoiceNumber}.pdf`,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: { scale: 2, useCORS: true, logging: false },
     jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
   });
 
   const withTemporaryLayoutChange = async <T,>(action: () => Promise<T>): Promise<T> => {
     const appLayoutMain = document.querySelector('main.flex-1');
-    const originalMainClass = appLayoutMain?.className;
+    let originalMainClass: string | undefined;
     if (appLayoutMain) {
-      appLayoutMain.className = 'p-0 m-0 overflow-visible';
+      originalMainClass = appLayoutMain.className;
+      appLayoutMain.className = 'p-0 m-0 overflow-visible'; // Critical for full capture
     }
-
+  
+    let result: T;
     try {
-      return await action();
+      result = await action();
     } finally {
-      if (appLayoutMain && originalMainClass) {
+      if (appLayoutMain && originalMainClass !== undefined) {
         appLayoutMain.className = originalMainClass;
       }
     }
+    return result;
   };
 
   const handleDownloadPdf = async () => {
@@ -70,72 +74,75 @@ export default function PreviewInvoicePage() {
     }
   };
 
-  const handlePrintPdf = async () => {
+ const handlePrintPdf = async () => {
     if (!invoice || !invoicePreviewRef.current) return;
 
     const element = invoicePreviewRef.current;
     const opt = commonPdfOptions(invoice.invoiceNumber);
-    let blobUrl = ''; // Keep blobUrl in a broader scope for cleanup
+    let blobUrl = ''; 
 
     await withTemporaryLayoutChange(async () => {
       try {
-        blobUrl = await html2pdf().from(element).set(opt).output('bloburl');
-        
-        const iframe = document.createElement('iframe');
-        iframe.style.display = 'none'; // Keep it hidden
+        const pdfBlob = await html2pdf().from(element).set(opt).output('blob');
+        blobUrl = URL.createObjectURL(pdfBlob);
 
-        // It's generally better to set up handlers before src
-        iframe.onload = () => {
-          setTimeout(() => { // Ensure PDF is rendered in iframe
-            try {
-              if (iframe.contentWindow && typeof iframe.contentWindow.print === 'function') {
-                iframe.contentWindow.focus(); // Focus the iframe's content window
-                iframe.contentWindow.print(); // Trigger print dialog
-              } else {
-                console.error("Print Error: Iframe content window or print function not available.");
-                toast({ title: "Print Error", description: "Failed to prepare document for printing.", variant: "destructive" });
+        const printWindow = window.open(blobUrl, '_blank');
+
+        if (printWindow) {
+          printWindow.onload = () => {
+            // This might run before the PDF is fully rendered by the browser's viewer
+            // A timeout helps, but it's not foolproof
+            setTimeout(() => {
+              try {
+                if (!printWindow.closed) {
+                  printWindow.focus();
+                  printWindow.print();
+                }
+                // Don't revoke blobUrl here, as print dialog might still be using it.
+              } catch (e) {
+                console.error("Error initiating print in the new window (onload):", e);
+                toast({
+                  title: "Print Ready",
+                  description: "Your invoice is in a new tab. Please use the browser's print option if the dialog didn't appear automatically.",
+                });
               }
-            } catch (printError) {
-              console.error("Error during printing:", printError);
-              toast({ title: "Print Error", description: "Could not initiate printing.", variant: "destructive" });
-            } finally {
-              // Cleanup iframe and blob URL
-              // Use a timeout to ensure print dialog isn't interrupted
-              setTimeout(() => {
-                if (document.body.contains(iframe)) {
-                  document.body.removeChild(iframe);
+            }, 500); // Adjust delay as needed
+          };
+          // Attempt print even if onload is slow or doesn't fire reliably for PDF viewers
+           setTimeout(() => {
+                if (printWindow && !printWindow.closed) {
+                    try {
+                        // Check if print function exists and window is still open
+                        if (typeof printWindow.print === 'function') {
+                            printWindow.focus(); // Important for some browsers
+                            printWindow.print();
+                        }
+                    } catch (e) {
+                        // This catch is for the setTimeout attempt, onload has its own.
+                         console.error("Error initiating print in the new window (timeout fallback):", e);
+                         // Avoid double-toasting if onload error also occurs
+                         if (!toast.toasts.find(t => t.title === "Print Ready")) {
+                            toast({
+                                title: "Print Ready",
+                                description: "Invoice opened in new tab. Use browser's print option if needed.",
+                            });
+                         }
+                    }
                 }
-                if (blobUrl) { 
-                  URL.revokeObjectURL(blobUrl);
-                }
-              }, 1000); // Delay cleanup slightly
-            }
-          }, 500); // Timeout for PDF rendering in iframe
-        };
-
-        iframe.onerror = (errEvt) => {
-          // errEvt could be an Event or string depending on browser
-          console.error("Error loading PDF into iframe:", errEvt);
-          toast({ title: "Print Error", description: "Failed to load PDF for printing.", variant: "destructive" });
-          if (document.body.contains(iframe)) {
-            document.body.removeChild(iframe);
-          }
-          if (blobUrl) {
-            URL.revokeObjectURL(blobUrl);
-          }
-        };
-        
-        iframe.src = blobUrl;
-        document.body.appendChild(iframe);
-
+            }, 1200); // Longer delay for this fallback attempt
+        } else {
+          toast({ title: "Print Error", description: "Could not open print window. Check pop-up blocker.", variant: "destructive" });
+          if (blobUrl) URL.revokeObjectURL(blobUrl);
+        }
       } catch (err) {
         console.error("Error generating PDF for printing:", err);
         toast({ title: "PDF Error", description: "Failed to generate PDF for printing.", variant: "destructive" });
-        if (blobUrl) { // If blobUrl was created before an error in iframe handling
-          URL.revokeObjectURL(blobUrl);
-        }
+        if (blobUrl) URL.revokeObjectURL(blobUrl);
       }
     });
+    // Note: Revoking blobUrl is tricky. If revoked too soon, print/display fails.
+    // Best to let the browser manage it when the new tab/window is closed.
+    // If blobUrl needs explicit cleanup, it should be done much later or based on window events.
   };
 
 
@@ -189,3 +196,4 @@ export default function PreviewInvoicePage() {
     </div>
   );
 }
+
