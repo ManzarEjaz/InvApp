@@ -37,12 +37,19 @@ const orgDetailsSchema = z.object({
       message: hexColorErrorMessage,
     })
     .optional(),
+  invoiceNumberPrefix: z.string()
+    .trim()
+    .length(3, "Prefix must be 3 characters")
+    .regex(/^[a-zA-Z0-9]{3}$/, "Prefix must be 3 alphanumeric characters")
+    .transform(val => val.toUpperCase())
+    .default('INV'),
 });
 
 type OrgDetailsFormValues = z.infer<typeof orgDetailsSchema>;
 
-const DEFAULT_INVOICE_HEADER_COLOR = '#739EDC'; // Corresponds to HSL 215 60% 65% (Muted Blue)
-const DEFAULT_THEME_ACCENT_COLOR = '#00BF62'; // Corresponds to HSL 155 100% 37% (Teal) - Updated to match spec
+const DEFAULT_INVOICE_HEADER_COLOR = '#739EDC'; 
+const DEFAULT_THEME_ACCENT_COLOR = '#00BF62'; 
+const DEFAULT_INVOICE_PREFIX = 'INV';
 
 export default function OrganizationSettingsForm() {
   const { organizationDetails, setOrganizationDetails, logAction } = useAppState();
@@ -60,6 +67,7 @@ export default function OrganizationSettingsForm() {
       contactDetails: '',
       invoiceHeaderColor: DEFAULT_INVOICE_HEADER_COLOR,
       themeAccentColor: DEFAULT_THEME_ACCENT_COLOR,
+      invoiceNumberPrefix: DEFAULT_INVOICE_PREFIX,
     },
   });
 
@@ -69,10 +77,23 @@ export default function OrganizationSettingsForm() {
         ...organizationDetails,
         invoiceHeaderColor: organizationDetails.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
         themeAccentColor: organizationDetails.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
+        invoiceNumberPrefix: organizationDetails.invoiceNumberPrefix || DEFAULT_INVOICE_PREFIX,
       });
       if (organizationDetails.companyLogo) {
         setLogoPreview(organizationDetails.companyLogo);
       }
+    } else {
+        // If no organizationDetails, ensure form defaults are set including prefix
+        form.reset({
+            companyName: '',
+            companyLogo: '',
+            gstNumber: '',
+            address: '',
+            contactDetails: '',
+            invoiceHeaderColor: DEFAULT_INVOICE_HEADER_COLOR,
+            themeAccentColor: DEFAULT_THEME_ACCENT_COLOR,
+            invoiceNumberPrefix: DEFAULT_INVOICE_PREFIX,
+        });
     }
   }, [organizationDetails, form]);
 
@@ -98,9 +119,9 @@ export default function OrganizationSettingsForm() {
     try {
       const processedData = {
         ...data,
-        // Store actual value, or default if empty. Let ThemeApplicator handle empty string as "use CSS default"
         invoiceHeaderColor: data.invoiceHeaderColor || DEFAULT_INVOICE_HEADER_COLOR,
         themeAccentColor: data.themeAccentColor || DEFAULT_THEME_ACCENT_COLOR,
+        invoiceNumberPrefix: (data.invoiceNumberPrefix || DEFAULT_INVOICE_PREFIX).toUpperCase(),
       };
       setOrganizationDetails(processedData);
       logAction("Updated Organization Settings");
@@ -116,7 +137,6 @@ export default function OrganizationSettingsForm() {
     if (newValue === '' || hexColorRegex.test(newValue)) {
       fieldOnChange(newValue);
     } else {
-      // Keep the input as is for typing, validation will show error
       fieldOnChange(newValue);
     }
   };
@@ -130,17 +150,37 @@ export default function OrganizationSettingsForm() {
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <CardContent className="space-y-6">
-            <FormField
-              control={form.control}
-              name="companyName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Company Name</FormLabel>
-                  <FormControl><Input placeholder="Your Company LLC" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <FormField
+                control={form.control}
+                name="companyName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Company Name</FormLabel>
+                    <FormControl><Input placeholder="Your Company LLC" {...field} /></FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="invoiceNumberPrefix"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Invoice Number Prefix</FormLabel>
+                    <FormControl><Input 
+                        placeholder={DEFAULT_INVOICE_PREFIX} 
+                        {...field} 
+                        maxLength={3} 
+                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                        />
+                    </FormControl>
+                    <FormDescription>3 alphanumeric characters (e.g., INV, ABC).</FormDescription>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
              <FormItem>
                 <FormLabel>Company Logo</FormLabel>
                 <FormControl>

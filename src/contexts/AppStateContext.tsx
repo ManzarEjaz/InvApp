@@ -41,8 +41,9 @@ const defaultOrgDetails: OrganizationDetails = {
   gstNumber: '',
   address: '',
   contactDetails: '',
-  invoiceHeaderColor: '#739EDC', // Default to current primary color
-  themeAccentColor: '#149E8E', // Default to current accent color (HSL 155 80% 40%)
+  invoiceHeaderColor: '#739EDC', 
+  themeAccentColor: '#149E8E',
+  invoiceNumberPrefix: 'INV', 
 };
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
@@ -55,23 +56,37 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [invoices, setInvoicesStorage] = useLocalStorage<Invoice[]>(INVOICES_STORAGE_KEY, []);
   const [actionLog, setActionLogStorage] = useLocalStorage<ActionLogEntry[]>(ACTION_LOG_STORAGE_KEY, []);
 
-  // Ensure inventory items always have a quantity (for items loaded from older local storage)
   const inventory = React.useMemo(() => {
     return rawInventory.map(item => ({
       ...item,
-      quantity: item.quantity ?? 0, // Default to 0 if quantity is undefined
+      quantity: item.quantity ?? 0, 
     }));
   }, [rawInventory]);
 
 
   const setOrganizationDetails = (details: OrganizationDetails) => {
-    setOrgDetailsStorage(prevDetails => ({
-      ...defaultOrgDetails, // Ensure all fields from default are present
-      ...prevDetails,      // Spread previous details
-      ...details           // Override with new details
-    }));
-    logAction("Updated Organization Settings", details);
+    const newDetails = {
+      ...defaultOrgDetails, 
+      ...organizationDetails, // Spread current state first to retain existing if not in `details`
+      ...details,          
+      invoiceNumberPrefix: (details.invoiceNumberPrefix || 'INV').toUpperCase(),
+    };
+    setOrgDetailsStorage(newDetails);
+    logAction("Updated Organization Settings", newDetails);
   };
+  
+  useEffect(() => {
+    // Ensure organizationDetails in storage is initialized with default prefix if it's missing
+    if (organizationDetails && !organizationDetails.invoiceNumberPrefix) {
+      setOrganizationDetails({ ...organizationDetails, invoiceNumberPrefix: 'INV' });
+    }
+    // If no org details at all, set with defaults (which includes prefix)
+    if (!organizationDetails) {
+        setOrgDetailsStorage(defaultOrgDetails);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [organizationDetails]);
+
 
   // Inventory Management
   const addInventoryItem = (item: Omit<InventoryItem, 'id'>) => {
@@ -98,11 +113,33 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   // Invoice Management
   const getNextInvoiceNumber = (): string => {
-    const latestInvoiceNumber = invoices.reduce((max, inv) => {
-        const numPart = parseInt(inv.invoiceNumber.replace(/[^0-9]/g, ''), 10);
-        return numPart > max ? numPart : max;
-    }, 0);
-    return `INV-${(latestInvoiceNumber + 1).toString().padStart(4, '0')}`;
+    const prefix = (organizationDetails?.invoiceNumberPrefix || 'INV').toUpperCase();
+    const now = new Date();
+    const year = now.getFullYear().toString();
+    const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    
+    const currentPattern = `${prefix}-${year}-${month}-`;
+    
+    const relevantInvoices = invoices.filter(inv => 
+      inv.invoiceNumber && inv.invoiceNumber.startsWith(currentPattern)
+    );
+    
+    let maxSeq = 0;
+    relevantInvoices.forEach(inv => {
+      const parts = inv.invoiceNumber.split('-');
+      if (parts.length === 4) {
+        const seqStr = parts[3];
+        if (seqStr && /^\d{5}$/.test(seqStr)) {
+          const seqNum = parseInt(seqStr, 10);
+          if (seqNum > maxSeq) {
+            maxSeq = seqNum;
+          }
+        }
+      }
+    });
+    
+    const nextSeq = (maxSeq + 1).toString().padStart(5, '0');
+    return `${currentPattern}${nextSeq}`;
   };
   
   const addInvoice = (invoiceData: Omit<Invoice, 'id' | 'invoiceNumber' | 'organizationDetails'> & { organizationDetails?: OrganizationDetails }) => {
@@ -144,9 +181,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setActionLogStorage(prev => [newLogEntry, ...prev].slice(0, 100)); // Keep last 100 logs
   };
   
-  // Initial log
   useEffect(() => {
-    if(actionLog.length === 0) { // Prevent logging on every mount if logs exist
+    if(actionLog.length === 0) { 
         logAction("Application Initialized / Loaded");
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -172,4 +208,3 @@ export const useAppState = (): AppStateContextType => {
   }
   return context;
 };
-

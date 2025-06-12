@@ -1,3 +1,4 @@
+
 export interface User {
   pinSetup: boolean;
 }
@@ -10,6 +11,7 @@ export interface OrganizationDetails {
   contactDetails: string; // Could be more structured: phone, email
   invoiceHeaderColor?: string; // Hex color string
   themeAccentColor?: string; // Hex color string
+  invoiceNumberPrefix?: string; // 3-character prefix, e.g., "INV"
 }
 
 export interface InventoryItem {
@@ -66,6 +68,3 @@ export interface AppData {
   invoices: Invoice[];
   actionLog: ActionLogEntry[];
 }
-
-
-

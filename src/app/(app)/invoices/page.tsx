@@ -4,11 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAppState } from "@/contexts/AppStateContext";
 import Link from "next/link";
-import { PlusCircle, Edit3, Eye, Trash2, Search, FileText, Printer, Loader2 } from "lucide-react";
+import { PlusCircle, Edit3, Eye, Trash2, Search, FileText, Printer, Loader2, Check, X } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { useState, useRef } from "react";
+import { useState, useRef, KeyboardEvent } from "react";
 import type { Invoice } from "@/lib/types";
 import {
   AlertDialog,
@@ -27,10 +27,12 @@ import html2pdf from 'html2pdf.js';
 import * as ReactDOMClient from 'react-dom/client'; 
 
 export default function InvoicesPage() {
-  const { invoices, deleteInvoice, logAction } = useAppState();
+  const { invoices, deleteInvoice, logAction, updateInvoice, organizationDetails } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const [isPrinting, setIsPrinting] = useState<string | null>(null); 
+  const [editingInvoiceNumberId, setEditingInvoiceNumberId] = useState<string | null>(null);
+  const [currentInvoiceNumberValue, setCurrentInvoiceNumberValue] = useState<string>("");
 
   const filteredInvoices = invoices
     .filter(invoice => {
@@ -43,7 +45,7 @@ export default function InvoicesPage() {
     .sort((a, b) => {
       const dateA = a && a.date ? new Date(a.date).getTime() : 0;
       const dateB = b && b.date ? new Date(b.date).getTime() : 0;
-      return dateB - dateA;
+      return dateB - dateA; // Sort by date descending
     });
 
 
@@ -52,6 +54,73 @@ export default function InvoicesPage() {
     logAction(`Deleted invoice ${invoiceNumber}`);
     toast({ title: "Invoice Deleted", description: `Invoice ${invoiceNumber} has been deleted.`});
   };
+
+  const handleEditInvoiceNumber = (invoice: Invoice) => {
+    setEditingInvoiceNumberId(invoice.id);
+    setCurrentInvoiceNumberValue(invoice.invoiceNumber);
+  };
+
+  const validateInvoiceNumberFormat = (invNum: string): boolean => {
+    const prefix = (organizationDetails?.invoiceNumberPrefix || "INV").toUpperCase();
+    const parts = invNum.split('-');
+    if (parts.length !== 4) return false; // INV-YYYY-MM-NNNNN
+    if (parts[0] !== prefix && parts[0].length !== 3) return false; // Could be a custom prefix or old format
+    if (parts[0].length === 3 && !/^[A-Z0-9]{3}$/.test(parts[0])) return false; // Validate custom prefix format
+    if (parts[1] && !/^\d{4}$/.test(parts[1])) return false; // YYYY
+    if (parts[2] && !/^\d{2}$/.test(parts[2])) return false; // MM
+    if (parts[3] && !/^\d{5}$/.test(parts[3])) return false; // NNNNN
+    
+    // If all parts are present and match the new format structure
+    if (parts[0].length === 3 && /^[A-Z0-9]{3}$/.test(parts[0]) &&
+        /^\d{4}$/.test(parts[1]) && /^\d{2}$/.test(parts[2]) && /^\d{5}$/.test(parts[3])) {
+      return true;
+    }
+    // Allow old format "INV-NNNN" for existing invoices
+    if (parts[0] === "INV" && parts.length === 2 && /^\d{4,}$/.test(parts[1])) {
+        return true;
+    }
+    // Fallback for other custom edits - basic check for non-empty
+    return invNum.trim().length > 0;
+  };
+
+
+  const handleSaveInvoiceNumber = (invoiceId: string) => {
+    if (!validateInvoiceNumberFormat(currentInvoiceNumberValue)) {
+        toast({
+            title: "Invalid Invoice Number Format",
+            description: `Invoice number must be in the format PREFIX-YYYY-MM-NNNNN or a previously valid format. Ensure prefix is 3 alphanumeric chars.`,
+            variant: "destructive"
+        });
+        return;
+    }
+
+    const existingInvoice = invoices.find(inv => inv.invoiceNumber === currentInvoiceNumberValue && inv.id !== invoiceId);
+    if (existingInvoice) {
+        toast({
+            title: "Duplicate Invoice Number",
+            description: "This invoice number is already in use. Please choose a unique number.",
+            variant: "destructive"
+        });
+        return;
+    }
+
+    const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
+    if (invoiceToUpdate) {
+      updateInvoice({ ...invoiceToUpdate, invoiceNumber: currentInvoiceNumberValue });
+      logAction(`Updated invoice number for ${invoiceToUpdate.customerName} to ${currentInvoiceNumberValue}`);
+      toast({ title: "Invoice Number Updated", description: `Set to ${currentInvoiceNumberValue}` });
+    }
+    setEditingInvoiceNumberId(null);
+  };
+  
+  const handleInvoiceNumberKeyDown = (event: KeyboardEvent<HTMLInputElement>, invoiceId: string) => {
+    if (event.key === 'Enter') {
+      handleSaveInvoiceNumber(invoiceId);
+    } else if (event.key === 'Escape') {
+      setEditingInvoiceNumberId(null);
+    }
+  };
+
 
   const commonPdfOptions = (invoiceNumber: string) => ({
     margin: 0.5, 
@@ -238,7 +307,27 @@ export default function InvoicesPage() {
                     
                     return (
                     <TableRow key={invoice.id}>
-                      <TableCell className="font-medium">{invoice.invoiceNumber || 'N/A'}</TableCell>
+                      <TableCell className="font-medium">
+                        {editingInvoiceNumberId === invoice.id ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="text"
+                              value={currentInvoiceNumberValue}
+                              onChange={(e) => setCurrentInvoiceNumberValue(e.target.value.toUpperCase())}
+                              onKeyDown={(e) => handleInvoiceNumberKeyDown(e, invoice.id)}
+                              onBlur={() => handleSaveInvoiceNumber(invoice.id)} 
+                              className="h-8 text-sm"
+                              autoFocus
+                            />
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleSaveInvoiceNumber(invoice.id)}><Check className="h-4 w-4 text-green-600" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setEditingInvoiceNumberId(null)}><X className="h-4 w-4 text-red-600" /></Button>
+                          </div>
+                        ) : (
+                          <span className="cursor-pointer hover:underline" onClick={() => handleEditInvoiceNumber(invoice)}>
+                            {invoice.invoiceNumber || 'N/A'}
+                          </span>
+                        )}
+                      </TableCell>
                       <TableCell>{invoice.customerName || 'N/A'}</TableCell>
                       <TableCell>{invoice.date ? new Date(invoice.date).toLocaleDateString() : 'N/A'}</TableCell>
                       <TableCell>{(invoice.grandTotal ?? 0).toFixed(2)}</TableCell>
@@ -308,4 +397,3 @@ export default function InvoicesPage() {
     </div>
   );
 }
-
