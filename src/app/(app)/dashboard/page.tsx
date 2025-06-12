@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { PlusCircle, FileText, Package, Settings } from "lucide-react";
+import SalesMetricsWidget from "@/components/dashboard/SalesMetricsWidget"; // Import the new widget
 
 export default function DashboardPage() {
   return (
@@ -22,6 +23,9 @@ export default function DashboardPage() {
       </Card>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        {/* Sales Metrics Widget spanning full width of the grid */}
+        <SalesMetricsWidget />
+
         <Card className="hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-xl font-medium">
