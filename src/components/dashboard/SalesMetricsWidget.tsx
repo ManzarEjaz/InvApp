@@ -26,11 +26,16 @@ export default function SalesMetricsWidget() {
     const currentMonthInvoices = invoices.filter(inv => inv.date && isSameMonth(parseISO(inv.date), currentDate));
 
     let totalSalesThisMonth = 0;
+    let totalGrossIncomeThisMonth = 0;
+
     currentMonthInvoices.forEach(inv => {
       totalSalesThisMonth += inv.grandTotal || 0;
+      (inv.lineItems || []).forEach(item => {
+        totalGrossIncomeThisMonth += (item.quantity || 0) * (item.price || 0);
+      });
     });
     setMonthlySales(totalSalesThisMonth);
-    setGrossIncomeThisMonth(totalSalesThisMonth); // Assumption: Gross income for the month is total sales
+    setGrossIncomeThisMonth(totalGrossIncomeThisMonth);
 
     const productSales: Record<string, number> = {};
     currentMonthInvoices.forEach(inv => {
@@ -125,14 +130,14 @@ export default function SalesMetricsWidget() {
           <div className="p-4 border rounded-lg shadow-sm bg-card">
             <div className="flex items-center text-sm font-medium text-muted-foreground mb-1">
               <DollarSign className="mr-2 h-5 w-5" />
-              Monthly Sales
+              Monthly Sales (incl. tax)
             </div>
             <p className="text-2xl font-semibold">{formatCurrency(monthlySales)}</p>
           </div>
           <div className="p-4 border rounded-lg shadow-sm bg-card">
             <div className="flex items-center text-sm font-medium text-muted-foreground mb-1">
               <DollarSign className="mr-2 h-5 w-5" />
-              Gross Income (This Month)
+              Gross Income (excl. tax)
             </div>
             <p className="text-2xl font-semibold">{formatCurrency(grossIncomeThisMonth)}</p>
           </div>
@@ -160,3 +165,4 @@ export default function SalesMetricsWidget() {
     </Card>
   );
 }
+
